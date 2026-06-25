@@ -1,0 +1,21 @@
+example:
+  platform: trustpilot
+  source_url: https://www.trustpilot.com/review/example.com
+  external_id: example.com
+  name: Example
+  ingestion_status: pending
+  reviews_count: 4
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}
+
+manual:
+  platform: manual
+  source_url: https://example.com/reviews
+  external_id: manual-example
+  name: Manual Example
+  ingestion_status: pending
+  reviews_count: 0
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}

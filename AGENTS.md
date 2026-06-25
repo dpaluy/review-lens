@@ -45,7 +45,7 @@ bin/rails db:prepare           # create + migrate dev DB
 
 bin/rubocop          # Omakase style (rubocop-rails-omakase), use -f github for CI
 bin/brakeman         # static security scan
-bin/bundler-audit   # gem CVE audit (config in config/bundler-audit.yml)
+bin/bundler-audit    # gem CVE audit (config in config/bundler-audit.yml)
 bin/importmap audit  # JS dependency audit
 bin/ci               # local CI runner helper
 ```
@@ -170,6 +170,8 @@ Use OpenAI Structured Outputs so the app can parse responses reliably.
 
 - Test saved HTML fixtures, never live scraping. Fixtures under
   `test/fixtures/files/` (e.g. `getapp_make.html`, `g2_notion.html`).
+- Use Rails fixtures for persisted test records. Do not call `create` /
+  `create!` in model tests when a fixture can represent the record.
 - Minitest. Default to TDD.
 - Build the scrape probe (`script/scrape_probe.rb`) to record fixtures before
   writing adapters.

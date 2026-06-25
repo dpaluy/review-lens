@@ -1,0 +1,37 @@
+positive:
+  product: example
+  external_review_id: review-positive
+  content_hash: positive-hash
+  source_url: https://www.trustpilot.com/review/example.com
+  rating: 4
+  sentiment: positive
+  body: Good product.
+  raw_payload: {}
+
+neutral:
+  product: example
+  external_review_id: review-neutral
+  content_hash: neutral-hash
+  source_url: https://www.trustpilot.com/review/example.com
+  rating: 3
+  sentiment: neutral
+  body: Fine product.
+  raw_payload: {}
+
+negative:
+  product: example
+  external_review_id: review-negative
+  content_hash: negative-hash
+  source_url: https://www.trustpilot.com/review/example.com
+  rating: 2
+  sentiment: negative
+  body: Bad product.
+  raw_payload: {}
+
+unknown:
+  product: example
+  content_hash: unknown-hash
+  source_url: https://www.trustpilot.com/review/example.com
+  sentiment: unknown
+  body: No rating.
+  raw_payload: {}
