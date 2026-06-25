@@ -2,30 +2,18 @@ require "test_helper"
 
 class ReviewTest < ActiveSupport::TestCase
   setup do
-    @product = Product.create!(
-      platform: "trustpilot",
-      source_url: "https://www.trustpilot.com/review/example.com",
-      external_id: "example.com",
-      name: "Example"
-    )
+    @product = products(:example)
   end
 
-  test "belongs to product" do
-    review = @product.reviews.create!(
-      content_hash: "review-hash",
-      source_url: @product.source_url,
-      rating: 4,
-      body: "Works well."
-    )
-
-    assert_equal @product, review.product
+  test "belongs to product from fixture" do
+    assert_equal @product, reviews(:positive).product
   end
 
   test "derives sentiment from rating" do
-    assert_equal "positive", @product.reviews.create!(content_hash: "positive", source_url: @product.source_url, rating: 4, body: "Good").sentiment
-    assert_equal "neutral", @product.reviews.create!(content_hash: "neutral", source_url: @product.source_url, rating: 3, body: "Fine").sentiment
-    assert_equal "negative", @product.reviews.create!(content_hash: "negative", source_url: @product.source_url, rating: 2, body: "Bad").sentiment
-    assert_equal "unknown", @product.reviews.create!(content_hash: "unknown", source_url: @product.source_url, body: "No rating").sentiment
+    assert_equal "positive", build_review(rating: 4).tap(&:valid?).sentiment
+    assert_equal "neutral", build_review(rating: 3).tap(&:valid?).sentiment
+    assert_equal "negative", build_review(rating: 2).tap(&:valid?).sentiment
+    assert_equal "unknown", build_review(rating: nil).tap(&:valid?).sentiment
   end
 
   test "requires a body" do
@@ -36,14 +24,8 @@ class ReviewTest < ActiveSupport::TestCase
   end
 
   test "enforces unique content hash per product" do
-    @product.reviews.create!(
-      content_hash: "same-hash",
-      source_url: @product.source_url,
-      body: "First"
-    )
-
     duplicate = @product.reviews.build(
-      content_hash: "same-hash",
+      content_hash: reviews(:positive).content_hash,
       source_url: @product.source_url,
       body: "Second"
     )
@@ -53,20 +35,22 @@ class ReviewTest < ActiveSupport::TestCase
   end
 
   test "normalizes blank external review ids so content hash remains fallback dedupe key" do
-    first = @product.reviews.create!(
+    review = build_review(
       external_review_id: "",
-      content_hash: "first-hash",
-      source_url: @product.source_url,
-      body: "First"
+      content_hash: "blank-external-id"
     )
-    second = @product.reviews.create!(
-      external_review_id: "",
-      content_hash: "second-hash",
-      source_url: @product.source_url,
-      body: "Second"
-    )
+    review.valid?
 
-    assert_nil first.external_review_id
-    assert_nil second.external_review_id
+    assert_nil review.external_review_id
+  end
+
+  private
+
+  def build_review(attributes = {})
+    @product.reviews.build({
+      content_hash: "new-review-hash",
+      source_url: @product.source_url,
+      body: "Review body"
+    }.merge(attributes))
   end
 end
