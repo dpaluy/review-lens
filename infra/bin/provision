@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+# Provision ReviewLens infrastructure on DigitalOcean.
+#
+#   infra/bin/provision --infra    OpenTofu: droplet, firewall, Spaces bucket
+#   infra/bin/provision --config   Ansible: harden, Docker, backup cron
+#   infra/bin/provision --deploy   Kamal setup
+#   infra/bin/provision --all      (default) all three
+#
+# Reads variables from the environment (or terraform.tfvars). See infra/README.md.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+INFRA_DIR="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$INFRA_DIR")"
+
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; NC='\033[0m'
+log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
+log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
+log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+
+usage() {
+  cat <<EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Provision and configure ReviewLens on DigitalOcean.
+
+OPTIONS:
+    --infra     Run OpenTofu (droplet, firewall, Spaces bucket)
+    --config    Run Ansible (Docker, hardening, backup cron)
+    --deploy    Bootstrap Kamal
+    --all       Run all steps (default)
+    -h, --help  Show this help
+
+Examples:
+    $(basename "$0")                # all steps
+    $(basename "$0") --infra
+    $(basename "$0") --config
+EOF
+}
+
+check_dependencies() {
+  local missing=()
+  command -v tofu            &>/dev/null || missing+=("tofu (OpenTofu)")
+  command -v ansible-playbook &>/dev/null || missing+=("ansible")
+  command -v kamal           &>/dev/null || missing+=("kamal")
+  [[ ${#missing[@]} -gt 0 ]] && {
+    log_error "Missing dependencies:"; printf '  - %s\n' "${missing[@]}"; exit 1
+  }
+}
+
+require_var() {
+  local name="$1"
+  [[ -n "${!name:-}" ]] || { log_error "$name is not set (see infra/README.md)"; exit 1; }
+}
+
+run_infra() {
+  log_info "Provisioning infrastructure with OpenTofu..."
+  cd "$INFRA_DIR"
+  [[ -f .terraform.lock.hcl ]] || tofu init
+  tofu plan -out=tfplan
+  read -rp "Apply changes? [y/N] " -n1 -r; echo
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
+    tofu apply tfplan && rm -f tfplan && echo && tofu output
+  else
+    log_warn "Skipped apply"; rm -f tfplan
+  fi
+}
+
+server_ip() {
+  (cd "$INFRA_DIR" && tofu output -raw server_ip 2>/dev/null) || true
+}
+
+run_config() {
+  log_info "Configuring Droplet with Ansible..."
+  cd "$INFRA_DIR"
+  local ip; ip="$(server_ip)"
+  [[ -n "$ip" ]] || read -rp "Enter server IP: " ip
+
+  require_var SPACES_ACCESS_KEY_ID
+  require_var SPACES_SECRET_ACCESS_KEY
+  require_var POSTGRES_PASSWORD
+
+  ansible-galaxy install -r ansible/requirements.yml
+  ansible-playbook -i "$ip," --user root ansible/playbook.yml \
+    -e backup_bucket="${SPACES_BUCKET:-reviewlens-backups}" \
+    -e spaces_region="${SPACES_REGION:-nyc3}" \
+    -e spaces_access_key_id="$SPACES_ACCESS_KEY_ID" \
+    -e spaces_secret_access_key="$SPACES_SECRET_ACCESS_KEY" \
+    -e db_password="$POSTGRES_PASSWORD"
+}
+
+run_deploy() {
+  log_info "Bootstrapping Kamal..."
+  cd "$PROJECT_ROOT"
+  local ip; ip="$(server_ip)"
+  if [[ -n "$ip" ]]; then
+    export DEPLOY_HOST="$ip"
+    log_info "Using DEPLOY_HOST=$ip from OpenTofu output"
+  else
+    require_var DEPLOY_HOST
+  fi
+  require_var DEPLOY_DOMAIN
+  require_var DIGITALOCEAN_API_TOKEN
+  require_var POSTGRES_PASSWORD
+  require_var OPENAI_API_KEY
+  kamal setup
+  log_info "Done. Future deploys: kamal deploy"
+}
+
+main() {
+  local run_all=true do_infra=false do_config=false do_deploy=false
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --infra)  do_infra=true;  run_all=false ;;
+      --config) do_config=true; run_all=false ;;
+      --deploy) do_deploy=true; run_all=false ;;
+      --all)    run_all=true ;;
+      -h|--help) usage; exit 0 ;;
+      *) log_error "Unknown option: $1"; usage; exit 1 ;;
+    esac; shift
+  done
+  $run_all && { do_infra=true; do_config=true; do_deploy=true; }
+  check_dependencies
+  $do_infra  && run_infra
+  $do_config && run_config
+  $do_deploy && run_deploy
+  log_info "All requested steps complete."
+}
+
+main "$@"
