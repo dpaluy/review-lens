@@ -1,24 +1,11 @@
 require "test_helper"
 
 class ProductTest < ActiveSupport::TestCase
-  test "has ingestion runs and reviews" do
-    product = Product.create!(
-      platform: "trustpilot",
-      source_url: "https://www.trustpilot.com/review/example.com",
-      external_id: "example.com",
-      name: "Example"
-    )
+  test "has ingestion runs and reviews from fixtures" do
+    product = products(:example)
 
-    ingestion_run = product.ingestion_runs.create!(status: "pending")
-    review = product.reviews.create!(
-      content_hash: "review-hash",
-      source_url: product.source_url,
-      rating: 5,
-      body: "Useful product."
-    )
-
-    assert_includes product.ingestion_runs, ingestion_run
-    assert_includes product.reviews, review
+    assert_includes product.ingestion_runs, ingestion_runs(:pending)
+    assert_includes product.reviews, reviews(:positive)
   end
 
   test "requires cache identity fields" do
@@ -31,17 +18,12 @@ class ProductTest < ActiveSupport::TestCase
   end
 
   test "enforces one cached product per platform external id pair" do
-    Product.create!(
-      platform: "trustpilot",
-      source_url: "https://www.trustpilot.com/review/example.com",
-      external_id: "example.com",
-      name: "Example"
-    )
+    existing_product = products(:example)
 
     duplicate = Product.new(
-      platform: "trustpilot",
-      source_url: "https://www.trustpilot.com/review/example.com",
-      external_id: "example.com",
+      platform: existing_product.platform,
+      source_url: existing_product.source_url,
+      external_id: existing_product.external_id,
       name: "Example Duplicate"
     )
 
@@ -49,14 +31,7 @@ class ProductTest < ActiveSupport::TestCase
     assert_includes duplicate.errors[:external_id], "has already been taken"
   end
 
-  test "defaults ingestion status to pending" do
-    product = Product.create!(
-      platform: "manual",
-      source_url: "https://example.com/reviews",
-      external_id: "manual-example",
-      name: "Manual Example"
-    )
-
-    assert_predicate product, :pending?
+  test "fixtures can represent pending cached products" do
+    assert_predicate products(:manual), :pending?
   end
 end
