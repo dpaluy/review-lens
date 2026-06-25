@@ -34,11 +34,17 @@
 /config/master.key
 /config/credentials/*.key
 
-# Ignore Kamal secrets (per AGENTS.md, secrets live in .kamal/secrets).
-/.kamal/secrets
+# Track .kamal/secrets because it contains 1Password references and shell wiring,
+# not secret values. Ignore local override files only.
+/.kamal/secrets.local
+/.kamal/secrets.*.local
+/.kamal/.env
 
-# Ignore node_modules.
+# Ignore node_modules and compiled assets.
 /node_modules/
+/app/assets/builds/*
+!/app/assets/builds/.keep
+/public/assets
 
 # Ignore local AI transcripts scratch (real transcripts under /ai-transcripts must be committed).
 

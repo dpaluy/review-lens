@@ -1,119 +1,107 @@
-# Name of your application. Used to uniquely configure containers.
+# Deployment configuration for DigitalOcean via Kamal 2.
+# See DEPLOY.md for provisioning and first-run instructions.
+#
+# Operator-provided values (set in your shell or CI before `kamal deploy`):
+#   DEPLOY_HOST            - public IP of the DigitalOcean Droplet
+#   DEPLOY_DOMAIN          - domain pointing at DEPLOY_HOST (A record)
+#   DIGITALOCEAN_API_TOKEN - DO API token (also authenticates the registry)
+#   POSTGRES_PASSWORD      - database password for the review_lens role
+#   DB_HOST                - Postgres host (defaults to the on-droplet accessory)
+#   OPENAI_MODEL           - e.g. gpt-4o-mini (defaults to gpt-4o-mini)
+
 service: review_lens
 
-# Name of the container image (use your-user/app-name on external registries).
-image: review_lens
+# Container image pushed to the DO Container Registry.
+# Kamal composes the full path as <registry.server>/<image>, so do NOT prefix
+# this with the registry host. Replace "reviewlens" with your DO registry
+# subscription name if different.
+image: reviewlens
 
-# Deploy to these servers.
+# Two processes per the PRD: a web server (Puma behind Thruster/kamal-proxy)
+# and a dedicated Solid Queue worker. They share env, secrets, and storage.
 servers:
   web:
-    - 192.168.0.1
-  # job:
-  #   hosts:
-  #     - 192.168.0.1
-  #   cmd: bin/jobs
+    hosts:
+      - <%= ENV.fetch("DEPLOY_HOST") %>
+  job:
+    hosts:
+      - <%= ENV.fetch("DEPLOY_HOST") %>
+    cmd: bin/jobs
 
-# Enable SSL auto certification via Let's Encrypt and allow for multiple apps on a single web server.
-# If used with Cloudflare, set encryption mode in SSL/TLS setting to "Full" to enable CF-to-app encryption.
-#
-# Using an SSL proxy like this requires turning on config.assume_ssl and config.force_ssl in production.rb!
-#
-# Don't use this when deploying to multiple web servers (then you have to terminate SSL at your load balancer).
-#
-# proxy:
-#   ssl: true
-#   host: app.example.com
+# kamal-proxy terminates SSL via Let's Encrypt and does zero-downtime rolling
+# restarts. Requires config.assume_ssl + config.force_ssl in production.rb.
+proxy:
+  ssl: true
+  host: <%= ENV.fetch("DEPLOY_DOMAIN") %>
+  healthcheck:
+    path: /up
+    interval: 3
+    timeout: 5
 
-# Where you keep your container images.
 registry:
-  # Alternatives: hub.docker.com / registry.digitalocean.com / ghcr.io / ...
-  server: localhost:5555
+  server: registry.digitalocean.com
+  # The DO API token authenticates to the registry.
+  username: <%= ENV.fetch("DIGITALOCEAN_API_TOKEN") %>
+  password:
+    - KAMAL_REGISTRY_PASSWORD
 
-  # Needed for authenticated registries.
-  # username: your-user
-
-  # Always use an access token rather than real password when possible.
-  # password:
-  #   - KAMAL_REGISTRY_PASSWORD
-
-# Inject ENV variables into containers (secrets come from .kamal/secrets).
 env:
+  clear:
+    RAILS_ENV: production
+    # Worker runs in its own container, not inside Puma.
+    SOLID_QUEUE_IN_PUMA: false
+    # Postgres host for the Solid Cache/Queue/Cable databases.
+    DB_HOST: <%= ENV.fetch("DB_HOST", "review_lens-db") %>
+    OPENAI_MODEL: <%= ENV.fetch("OPENAI_MODEL", "gpt-4o-mini") %>
   secret:
     - RAILS_MASTER_KEY
-  clear:
-    # Run the Solid Queue Supervisor inside the web server's Puma process to do jobs.
-    # When you start using multiple servers, you should split out job processing to a dedicated machine.
-    SOLID_QUEUE_IN_PUMA: true
+    - DATABASE_URL
+    - CACHE_DATABASE_URL
+    - QUEUE_DATABASE_URL
+    - CABLE_DATABASE_URL
+    - OPENAI_API_KEY
 
-    # Set number of processes dedicated to Solid Queue (default: 1)
-    # JOB_CONCURRENCY: 3
+# PostgreSQL as an on-droplet accessory. The init.sql file creates the three
+# extra databases Rails needs for Solid Cache/Queue/Cable. For a managed
+# production setup, swap this for a DigitalOcean Managed Database and point
+# DB_HOST/DATABASE_URL at it (see DEPLOY.md).
+accessories:
+  db:
+    image: postgres:16
+    host: <%= ENV.fetch("DEPLOY_HOST") %>
+    # Bind only to localhost so Postgres is never exposed to the public internet.
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_USER: review_lens
+        POSTGRES_DB: review_lens_production
+      secret:
+        - POSTGRES_PASSWORD
+    files:
+      - config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    directories:
+      - review_lens_pg:/var/lib/postgresql/data
+    options:
+      shm-size: 256m
 
-    # Set number of cores available to the application on each server (default: 1).
-    # WEB_CONCURRENCY: 2
-
-    # Match this to any external database server to configure Active Record correctly
-    # Use review_lens-db for a db accessory server on same machine via local kamal docker network.
-    # DB_HOST: 192.168.0.2
-
-    # Log everything from Rails
-    # RAILS_LOG_LEVEL: debug
-
-# Aliases are triggered with "bin/kamal <alias>". You can overwrite arguments on invocation:
-# "bin/kamal logs -r job" will tail logs from the first server in the job section.
 aliases:
   console: app exec --interactive --reuse "bin/rails console"
   shell: app exec --interactive --reuse "bash"
   logs: app logs -f
+  job-logs: app logs -f -r job
   dbc: app exec --interactive --reuse "bin/rails dbconsole --include-password"
 
-# Use a persistent storage volume for sqlite database files and local Active Storage files.
-# Recommended to change this to a mounted volume path that is backed up off server.
+# Persistent storage for Active Storage uploads. Shared by web and job roles.
 volumes:
   - "review_lens_storage:/rails/storage"
 
-# Bridge fingerprinted assets, like JS and CSS, between versions to avoid
-# hitting 404 on in-flight requests. Combines all files from new and old
-# version inside the asset_path.
+# Bridge fingerprinted assets between versions to avoid 404s on in-flight requests.
 asset_path: /rails/public/assets
 
-# Configure the image builder.
+# Build for amd64 (DO Droplets). On Apple Silicon this builds via QEMU; use a
+# remote builder (see DEPLOY.md) for faster native builds if desired.
 builder:
   arch: amd64
 
-  # # Build image via remote server (useful for faster amd64 builds on arm64 computers)
-  # remote: ssh://docker@docker-builder-server
-  #
-  # # Pass arguments and secrets to the Docker build process
-  # args:
-  #   RUBY_VERSION: ruby-4.0.5
-  # secrets:
-  #   - GITHUB_TOKEN
-  #   - RAILS_MASTER_KEY
-
-# Use a different ssh user than root
-# ssh:
-#   user: app
-
-# Use accessory services (secrets come from .kamal/secrets).
-# accessories:
-#   db:
-#     image: mysql:8.0
-#     host: 192.168.0.2
-#     # Change to 3306 to expose port to the world instead of just local network.
-#     port: "127.0.0.1:3306:3306"
-#     env:
-#       clear:
-#         MYSQL_ROOT_HOST: '%'
-#       secret:
-#         - MYSQL_ROOT_PASSWORD
-#     files:
-#       - config/mysql/production.cnf:/etc/mysql/my.cnf
-#       - db/production.sql:/docker-entrypoint-initdb.d/setup.sql
-#     directories:
-#       - data:/var/lib/mysql
-#   redis:
-#     image: valkey/valkey:8
-#     host: 192.168.0.2
-#     port: 6379
-#     directories:
-#       - data:/data
+ssh:
+  user: root
