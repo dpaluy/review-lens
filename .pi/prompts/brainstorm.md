@@ -1,0 +1,1 @@
+/Users/dpaluy/projects/ai/majestic-packs/packs/reasoning/prompts/brainstorm.md

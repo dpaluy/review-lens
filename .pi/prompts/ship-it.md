@@ -1,0 +1,1 @@
+/Users/dpaluy/projects/ai/majestic-packs/packs/engineer/prompts/ship-it.md
