@@ -8,9 +8,12 @@ PostgreSQL accessory for the four Rails databases (primary + Cache/Queue/Cable).
 
 - DigitalOcean account with API token (read/write). Create one at
   https://cloud.digitalocean.com/account/api/tokens.
-- `doctl` CLI authenticated (`doctl auth init`).
-- `kamal` 2.x installed locally (`gem install kamal`).
-- A domain name you control, with DNS access.
+- A 1Password vault with the deployment secrets (see `.kamal/secrets` for the
+  exact `op://` references). The `op` CLI must be installed and signed in.
+- `doctl` CLI authenticated (`doctl auth init`) for one-off manual operations.
+- `kamal` 2.x (`gem install kamal`), `opentofu`, and `ansible` for the
+  declarative provisioner (see `infra/`).
+- A domain name with DNS access. This project targets `app.cairnfoundry.com`.
 
 ## 1. Provision a DigitalOcean Droplet
 
@@ -33,7 +36,7 @@ Record the public IP:
 doctl compute droplet get reviewlens --template "{{.PublicIPv4}}"
 ```
 
-Add an **A record** pointing your domain (e.g. `reviewlens.example.com`) at this
+Add an **A record** pointing your domain (`app.cairnfoundry.com`) at this
 IP. Configure a DigitalOcean Cloud Firewall (or UFW) to allow inbound
 `22`, `80`, `443` only.
 
@@ -49,20 +52,30 @@ doctl registry login   # configures docker auth using your API token
 
 ## 3. Configure DNS + secrets
 
-Export the deployment values (do this in every shell or CI runner that deploys):
+All secrets live in 1Password and are resolved by `.kamal/secrets` and
+`infra/bin/provision` via the `op` CLI. Create these items in your vault
+(rename the `op://` refs in `.kamal/secrets` if your layout differs):
+
+| Item reference | Value |
+|----------------|-------|
+| `reviewlens/digitalocean/api_token` | DO API token (read/write) |
+| `reviewlens/production-rails/master_key` | contents of `config/master.key` |
+| `reviewlens/production-postgres/password` | `openssl rand -hex 24` |
+| `reviewlens/openai/api_key` | OpenAI API key |
+| `reviewlens/digitalocean-spaces/access_key_id` | DO Spaces access key |
+| `reviewlens/digitalocean-spaces/secret_access_key` | DO Spaces secret key |
+
+Then export the non-secret deployment values:
 
 ```bash
-export DEPLOY_HOST=203.0.113.10            # Droplet public IP
-export DEPLOY_DOMAIN=reviewlens.example.com # your domain
-export DIGITALOCEAN_API_TOKEN=dop_xxxxxxxx  # DO API token (also the registry password)
-export POSTGRES_PASSWORD=$(openssl rand -hex 24)  # database password
-export OPENAI_API_KEY=sk-xxxxxxxx
-export OPENAI_MODEL=gpt-4o-mini            # optional, defaults to gpt-4o-mini
+export OP_ACCOUNT=my.1password.com
+export DEPLOY_DOMAIN=app.cairnfoundry.com
+export ADMIN_IP=203.0.113.5/32   # your IP in CIDR, for SSH firewall
 ```
 
-`config/master.key` already exists locally; Kamal reads it via `.kamal/secrets`.
-Keep a backup of both `config/master.key` and `POSTGRES_PASSWORD` somewhere safe
-(password manager). They are not in version control.
+Kamal reads the rest from 1Password when it sources `.kamal/secrets`. Keep a
+backup of `config/master.key` and the Postgres password somewhere safe; they
+are not in version control.
 
 ## 4. First deployment
 
@@ -78,7 +91,7 @@ bin/kamal setup    # installs Docker, boots accessories, deploys, enables SSL
 4. Launch the `web` and `job` roles.
 5. Provision a Let's Encrypt certificate via kamal-proxy.
 
-Verify: `curl -I https://reviewlens.example.com/up` should return `200 OK`.
+Verify: `curl -I https://app.cairnfoundry.com/up` should return `200 OK`.
 
 ## 5. Subsequent deploys and operations
 

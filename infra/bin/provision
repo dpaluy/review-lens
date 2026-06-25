@@ -40,6 +40,7 @@ EOF
 
 check_dependencies() {
   local missing=()
+  command -v op              &>/dev/null || missing+=("op (1Password CLI)")
   command -v tofu            &>/dev/null || missing+=("tofu (OpenTofu)")
   command -v ansible-playbook &>/dev/null || missing+=("ansible")
   command -v kamal           &>/dev/null || missing+=("kamal")
@@ -51,6 +52,40 @@ check_dependencies() {
 require_var() {
   local name="$1"
   [[ -n "${!name:-}" ]] || { log_error "$name is not set (see infra/README.md)"; exit 1; }
+}
+
+# Pull every secret from 1Password. Mirrors .kamal/secrets so Kamal and
+# OpenTofu/Ansible share one source of truth. Requires OP_ACCOUNT.
+load_secrets_from_1password() {
+  log_info "Loading secrets from 1Password..."
+  : "${OP_ACCOUNT:?OP_ACCOUNT is not set (e.g. my.1password.com)}"
+
+  op() { command op "$@"; }   # allow override in tests
+
+  export TF_VAR_do_token
+  TF_VAR_do_token=$(op read "op://reviewlens/digitalocean/api_token" --account "$OP_ACCOUNT")
+
+  export TF_VAR_spaces_access_key_id
+  TF_VAR_spaces_access_key_id=$(op read "op://reviewlens/digitalocean-spaces/access_key_id" --account "$OP_ACCOUNT")
+  export TF_VAR_spaces_secret_access_key
+  TF_VAR_spaces_secret_access_key=$(op read "op://reviewlens/digitalocean-spaces/secret_access_key" --account "$OP_ACCOUNT")
+
+  export DIGITALOCEAN_API_TOKEN="$TF_VAR_do_token"
+  export POSTGRES_PASSWORD
+  POSTGRES_PASSWORD=$(op read "op://reviewlens/production-postgres/password" --account "$OP_ACCOUNT")
+  export OPENAI_API_KEY
+  OPENAI_API_KEY=$(op read "op://reviewlens/openai/api_key" --account "$OP_ACCOUNT")
+
+  # SSH public key lives on disk; point OP_SSH_PUBKEY at an op:// ref if you
+  # store it in 1Password instead.
+  export TF_VAR_ssh_public_key
+  TF_VAR_ssh_public_key="${SSH_PUBLIC_KEY:-$(cat "${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}")}"
+
+  # Admin SSH allowlist. MUST be a real operator CIDR; 0.0.0.0/0 is rejected.
+  : "${ADMIN_IP:?ADMIN_IP is not set (CIDR, e.g. 203.0.113.5/32)}"
+  export TF_VAR_admin_ip="$ADMIN_IP"
+
+  log_info "Secrets loaded successfully"
 }
 
 run_infra() {
@@ -76,16 +111,16 @@ run_config() {
   local ip; ip="$(server_ip)"
   [[ -n "$ip" ]] || read -rp "Enter server IP: " ip
 
-  require_var SPACES_ACCESS_KEY_ID
-  require_var SPACES_SECRET_ACCESS_KEY
+  require_var TF_VAR_spaces_access_key_id
+  require_var TF_VAR_spaces_secret_access_key
   require_var POSTGRES_PASSWORD
 
   ansible-galaxy install -r ansible/requirements.yml
   ansible-playbook -i "$ip," --user root ansible/playbook.yml \
     -e backup_bucket="${SPACES_BUCKET:-reviewlens-backups}" \
     -e spaces_region="${SPACES_REGION:-nyc3}" \
-    -e spaces_access_key_id="$SPACES_ACCESS_KEY_ID" \
-    -e spaces_secret_access_key="$SPACES_SECRET_ACCESS_KEY" \
+    -e spaces_access_key_id="$TF_VAR_spaces_access_key_id" \
+    -e spaces_secret_access_key="$TF_VAR_spaces_secret_access_key" \
     -e db_password="$POSTGRES_PASSWORD"
 }
 
@@ -103,6 +138,7 @@ run_deploy() {
   require_var DIGITALOCEAN_API_TOKEN
   require_var POSTGRES_PASSWORD
   require_var OPENAI_API_KEY
+  # .kamal/secrets resolves the rest (master key, DB URLs) from 1Password.
   kamal setup
   log_info "Done. Future deploys: kamal deploy"
 }
@@ -121,6 +157,7 @@ main() {
   done
   $run_all && { do_infra=true; do_config=true; do_deploy=true; }
   check_dependencies
+  load_secrets_from_1password
   $do_infra  && run_infra
   $do_config && run_config
   $do_deploy && run_deploy

@@ -48,13 +48,14 @@ EOF
 Also export for the deploy/config steps:
 
 ```bash
-export DIGITALOCEAN_API_TOKEN=dop_xxxxxxxx
-export POSTGRES_PASSWORD=$(openssl rand -hex 24)
-export OPENAI_API_KEY=sk-xxxxxxxx
-export DEPLOY_DOMAIN=reviewlens.example.com
-export SPACES_ACCESS_KEY_ID=...
-export SPACES_SECRET_ACCESS_KEY=...
+export OP_ACCOUNT=my.1password.com
+export DEPLOY_DOMAIN=app.cairnfoundry.com
+export ADMIN_IP=203.0.113.5/32   # your IP in CIDR
 ```
+
+Secrets (DO token, Postgres password, OpenAI key, Spaces keys, Rails master
+key) are pulled from 1Password by `.kamal/secrets` and `infra/bin/provision`.
+Create the items listed in `DEPLOY.md` step 3.
 
 ## Provisioning
 
