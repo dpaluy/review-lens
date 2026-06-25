@@ -1,0 +1,10 @@
+pending:
+  product: example
+  status: pending
+  pages_attempted: 0
+  pages_succeeded: 0
+  reviews_found: 0
+  reviews_imported: 0
+  reviews_skipped: 0
+  warnings: []
+  raw_fetch_metadata: {}
