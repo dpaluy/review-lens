@@ -58,8 +58,8 @@ All secrets live in 1Password and are resolved by `.kamal/secrets` and
 
 | Item reference | Value |
 |----------------|-------|
-| `reviewlens/digitalocean/api_token` | DO API token (read/write) |
-| `reviewlens/production-rails/master_key` | contents of `config/master.key` |
+| `reviewlens/digitalocean/credential` | DO API token (read/write) |
+| `reviewlens/production-rails/production_key` | contents of `config/credentials/production.key` |
 | `reviewlens/production-postgres/password` | `openssl rand -hex 24` |
 | `reviewlens/openai/api_key` | OpenAI API key |
 | `reviewlens/digitalocean-spaces/access_key_id` | DO Spaces access key |
@@ -68,7 +68,7 @@ All secrets live in 1Password and are resolved by `.kamal/secrets` and
 Then export the non-secret deployment values:
 
 ```bash
-export OP_ACCOUNT=my.1password.com
+export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI   # david@paluy.org
 export DEPLOY_DOMAIN=app.cairnfoundry.com
 export ADMIN_IP=203.0.113.5/32   # your IP in CIDR, for SSH firewall
 ```

@@ -48,7 +48,7 @@ EOF
 Also export for the deploy/config steps:
 
 ```bash
-export OP_ACCOUNT=my.1password.com
+export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI   # david@paluy.org
 export DEPLOY_DOMAIN=app.cairnfoundry.com
 export ADMIN_IP=203.0.113.5/32   # your IP in CIDR
 ```

@@ -58,12 +58,12 @@ require_var() {
 # OpenTofu/Ansible share one source of truth. Requires OP_ACCOUNT.
 load_secrets_from_1password() {
   log_info "Loading secrets from 1Password..."
-  : "${OP_ACCOUNT:?OP_ACCOUNT is not set (e.g. my.1password.com)}"
+  : "${OP_ACCOUNT:?OP_ACCOUNT is not set (use HOPQBD5OXZDG7M6WBMJPF6RKRI for david@paluy.org)}"
 
   op() { command op "$@"; }   # allow override in tests
 
   export TF_VAR_do_token
-  TF_VAR_do_token=$(op read "op://reviewlens/digitalocean/api_token" --account "$OP_ACCOUNT")
+  TF_VAR_do_token=$(op read "op://reviewlens/digitalocean/credential" --account "$OP_ACCOUNT")
 
   export TF_VAR_spaces_access_key_id
   TF_VAR_spaces_access_key_id=$(op read "op://reviewlens/digitalocean-spaces/access_key_id" --account "$OP_ACCOUNT")
