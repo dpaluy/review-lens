@@ -1,25 +1,34 @@
 require "test_helper"
 
 class ProductTest < ActiveSupport::TestCase
-test "has ingestion runs reviews fixtures" do
-product = products(:example)
+  test "has ingestion runs reviews fixtures" do
+    product = products(:example)
 
-assert_includes product.ingestion_runs, ingestion_runs(:pending)
-assert_includes product.reviews, reviews(:positive)
-end
+    assert_includes product.ingestion_runs, ingestion_runs(:pending)
+    assert_includes product.reviews, reviews(:positive)
+  end
 
   test "conversation bang creates then reuses one product conversation" do
     product = products(:ready)
 
-assert_difference -> { product.conversations.count }, 1 do
-product.conversation!
-end
+    assert_difference -> { product.conversations.count }, 1 do
+      product.conversation!
+    end
 
-first_conversation = product.conversations.order(:id).first
+    first_conversation = product.conversations.order(:id).first
 
-assert_no_difference -> { product.conversations.count } do
+    assert_no_difference -> { product.conversations.count } do
       assert_equal first_conversation, product.conversation!
     end
+  end
+
+  test "conversation bang does not require configured RubyLLM provider credentials" do
+    original_openai_api_key = RubyLLM.config.openai_api_key
+    RubyLLM.config.openai_api_key = nil
+
+    assert_predicate products(:ready).conversation!, :persisted?
+  ensure
+    RubyLLM.config.openai_api_key = original_openai_api_key
   end
 
   test "conversation does not return stale unsaved record after conversation bang" do
@@ -35,7 +44,7 @@ assert_no_difference -> { product.conversations.count } do
   end
 
   test "requires source url before deriving cache identity" do
-product = Product.new(name: "Example")
+    product = Product.new(name: "Example")
 
     assert_not product.valid?
     assert_includes product.errors[:source_url], "can't be blank"

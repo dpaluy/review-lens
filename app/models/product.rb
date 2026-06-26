@@ -79,12 +79,12 @@ class Product < ApplicationRecord
   end
 
   def conversation
-    conversations.order(:id).first || conversations.build
+    conversations.order(:id).first || conversations.build(ai_model: product_conversation_ai_model)
   end
 
   def conversation!
     @conversation = with_lock do
-      conversations.order(:id).first || conversations.create!
+      conversations.order(:id).first || conversations.create!(ai_model: product_conversation_ai_model)
     end
   end
 
@@ -101,6 +101,14 @@ class Product < ApplicationRecord
   end
 
   private
+
+  def product_conversation_ai_model
+    model_id = RubyLLM.config.default_model
+
+    AIModel.find_or_create_by!(provider: "openai", model_id:) do |model|
+      model.name = model_id
+    end
+  end
 
   def self.parse_source_uri(source_url)
     URI.parse(source_url)
