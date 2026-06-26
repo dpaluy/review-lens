@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_035724) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_035725) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -115,6 +115,18 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_035724) do
     t.index ["status"], name: "index_ingestion_runs_on_status"
   end
 
+  create_table "insight_batches", force: :cascade do |t|
+    t.integer "batch_index", null: false
+    t.datetime "created_at", null: false
+    t.bigint "product_id", null: false
+    t.jsonb "review_ids", default: [], null: false
+    t.integer "reviews_count", null: false
+    t.jsonb "summary", default: {}, null: false
+    t.datetime "updated_at", null: false
+    t.index ["product_id", "batch_index"], name: "index_insight_batches_on_product_id_and_batch_index", unique: true
+    t.index ["product_id"], name: "index_insight_batches_on_product_id"
+  end
+
   create_table "products", force: :cascade do |t|
     t.decimal "average_rating", precision: 3, scale: 2
     t.datetime "created_at", null: false
@@ -180,6 +192,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_035724) do
   add_foreign_key "conversations", "ai_models"
   add_foreign_key "conversations", "products"
   add_foreign_key "ingestion_runs", "products"
+  add_foreign_key "insight_batches", "products"
   add_foreign_key "reviews", "products"
   add_foreign_key "tool_calls", "chat_messages"
 end
