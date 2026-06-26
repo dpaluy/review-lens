@@ -8,3 +8,40 @@ pending:
   reviews_skipped: 0
   warnings: []
   raw_fetch_metadata: {}
+
+fetching:
+  product: fetching
+  status: fetching
+  pages_attempted: 2
+  pages_succeeded: 1
+  reviews_found: 8
+  reviews_imported: 0
+  reviews_skipped: 0
+  warnings:
+    - Second page returned no usable review cards
+  raw_fetch_metadata: {}
+
+ready:
+  product: ready
+  status: ready
+  pages_attempted: 4
+  pages_succeeded: 4
+  reviews_found: 25
+  reviews_imported: 24
+  reviews_skipped: 1
+  warnings:
+    - One duplicate review was skipped
+  raw_fetch_metadata: {}
+
+failed:
+  product: failed
+  status: failed
+  pages_attempted: 1
+  pages_succeeded: 0
+  reviews_found: 0
+  reviews_imported: 0
+  reviews_skipped: 0
+  warnings:
+    - Trustpilot returned a blocking page before parsing
+  error: Fetch blocked by remote host
+  raw_fetch_metadata: {}

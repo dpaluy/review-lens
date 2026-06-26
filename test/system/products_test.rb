@@ -10,8 +10,10 @@ class ProductsTest < ApplicationSystemTestCase
     assert_text "quickbooks.intuit.com"
     assert_text "Platform"
     assert_text "trustpilot"
-    assert_text "Status"
+    assert_text "Product status"
+    assert_text "Run status"
     assert_text "pending"
-    assert_text "Ingestion run"
+    assert_text "Pages attempted"
+    assert_text "Reviews found"
   end
 end

@@ -4,9 +4,10 @@
   <% if @product.thin_corpus? %>
     <section data-testid="thin-corpus-warning" role="alert">
       <h2>Thin corpus</h2>
+
       <p>
-        Only <%= pluralize(@product.usable_review_count, "usable review") %> are available.
-        ReviewLens needs at least <%= Product::MINIMUM_USABLE_REVIEW_COUNT %> usable reviews for grounded answers.
+        Only <%= pluralize(@product.usable_review_count, "usable review") %> available.
+        ReviewLens needs least <%= Product::MINIMUM_USABLE_REVIEW_COUNT %> usable reviews for grounded answers.
       </p>
     </section>
   <% end %>
@@ -14,6 +15,7 @@
   <% if @ingestion_run.warning_messages.any? %>
     <section data-testid="parser-warnings" role="alert">
       <h2>Parser warnings</h2>
+
       <ul>
         <% @ingestion_run.warning_messages.each do |warning_message| %>
           <li><%= warning_message %></li>
@@ -29,14 +31,20 @@
     <dt>Source URL</dt>
     <dd><%= @product.source_url %></dd>
 
-    <dt>Status</dt>
+    <dt>Product status</dt>
     <dd><%= @product.ingestion_status %></dd>
 
-    <dt>Ingestion run</dt>
+    <dt>Run status</dt>
     <dd><%= @ingestion_run.status %></dd>
 
     <dt>Usable reviews</dt>
     <dd><%= @product.usable_review_count %></dd>
+
+    <dt>Pages attempted</dt>
+    <dd><%= @ingestion_run.pages_attempted %></dd>
+
+    <dt>Pages succeeded</dt>
+    <dd><%= @ingestion_run.pages_succeeded %></dd>
 
     <dt>Reviews found</dt>
     <dd><%= @ingestion_run.reviews_found %></dd>
@@ -46,10 +54,14 @@
 
     <dt>Reviews skipped</dt>
     <dd><%= @ingestion_run.reviews_skipped %></dd>
-
-    <% if @product.ingestion_error.present? %>
-      <dt>Error</dt>
-      <dd><%= @product.ingestion_error %></dd>
-    <% end %>
   </dl>
+
+  <% failure_message = @ingestion_run.error.presence || @product.ingestion_error.presence %>
+  <% if failure_message.present? %>
+    <section>
+      <h2>Failure</h2>
+
+      <p><%= failure_message %></p>
+    </section>
+  <% end %>
 </main>
