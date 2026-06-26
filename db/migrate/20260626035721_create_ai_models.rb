@@ -1,4 +1,4 @@
-class CreateAiModels < ActiveRecord::Migration[8.1]
+class CreateAIModels < ActiveRecord::Migration[8.1]
   def change
     create_table :ai_models do |t|
       t.string :model_id, null: false
