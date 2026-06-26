@@ -68,29 +68,19 @@
             style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
         </div>
 
-        <div style="margin-bottom:16px;">
-          <label for="product_manual_source_url" style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Source URL <span style="font-weight:400;text-transform:none;">(optional)</span></label>
-          <%= form.url_field :source_url,
-            id: "product_manual_source_url",
-            placeholder: "https://www.trustpilot.com/review/…",
-            disabled: true,
-            data: { "import-mode-target": "csvInput" },
-            style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
-        </div>
-
         <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
-          <label style="font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;">Paste reviews or CSV</label>
+          <label for="product_manual_file" style="font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;">Upload reviews CSV</label>
           <%= link_to "Download sample CSV", "/samples/reviews.csv", download: "reviewlens-sample-reviews.csv", style: "font-size:12px;color:#1f8a5b;text-decoration:none;" %>
         </div>
         <div style="border:2px dashed #d4e8dd;border-radius:10px;background:#f7fcf9;padding:28px 20px;text-align:center;margin-bottom:8px;">
-          <p style="font-size:13px;color:#565b62;margin:0 0 6px;">Paste sample CSV rows or blank-line-separated review blocks below</p>
+          <p style="font-size:13px;color:#565b62;margin:0 0 6px;">Choose a CSV file to upload and parse in the background</p>
           <p style="font-size:12px;color:#8a9099;margin:0;">Columns: <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#e8ede9;padding:1px 5px;border-radius:4px;">title, body, rating, reviewer, date</code></p>
         </div>
-        <%= form.text_area :manual_reviews, rows: 7,
-          placeholder: "Paste CSV with a body column, or one review per block separated by a blank line.",
+        <%= form.file_field :manual_file,
+          accept: "text/csv",
           disabled: true,
           data: { "import-mode-target": "csvInput" },
-          style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;resize:vertical;" %>
+          style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
       </div>
 
       <button type="submit"

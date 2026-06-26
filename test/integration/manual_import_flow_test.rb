@@ -1,75 +1,29 @@
 require "test_helper"
 
 class ManualImportFlowTest < ActionDispatch::IntegrationTest
-  test "creates manual import product from pasted review blocks" do
+  include ActiveJob::TestHelper
+
+  test "new page renders a file upload field for manual import" do
     get new_product_path
 
     assert_response :success
     assert_select "input[type=hidden][name='product[import_mode]']"
-    assert_select "textarea[name='product[manual_reviews]']"
-
-    pasted_reviews = <<~TEXT
-      Setup simple and support answered quickly.
-
-
-      Billing confusing cancellation took too long.
-
-      Setup simple and support answered quickly.
-
-
-    TEXT
-
-    with_fake_batch_summary_client do |client|
-      assert_difference -> { Product.count }, 1 do
-        assert_difference -> { IngestionRun.count }, 1 do
-          assert_difference -> { Review.count }, 2 do
-            assert_difference -> { InsightBatch.count }, 1 do
-              post products_path, params: {
-                product: {
-                  import_mode: "manual",
-                  name: "Manual CRM",
-                  source_url: "https://example.com/manual-crm-reviews",
-                  manual_reviews: pasted_reviews
-                }
-              }
-            end
-          end
-        end
-      end
-
-      assert_equal 1, client.calls.size
-    end
-
-    product = Product.order(:created_at).last
-    ingestion_run = product.ingestion_runs.last
-
-    assert_redirected_to product_path(product)
-    assert_equal "manual", product.platform
-    assert_equal "Manual CRM", product.name
-    assert_equal "https://example.com/manual-crm-reviews", product.source_url
-    assert_predicate product, :ready?
-    assert_predicate ingestion_run, :ready?
-    assert_equal 3, ingestion_run.reviews_found
-    assert_equal 2, ingestion_run.reviews_imported
-    assert_equal 1, ingestion_run.reviews_skipped
-    assert_equal 2, product.reviews_count
-    assert_equal 1, product.insight_batches.count
-    assert_equal [
-      "Billing confusing cancellation took too long.",
-      "Setup simple and support answered quickly."
-    ], product.reviews.order(:body).pluck(:body)
+    assert_select "input[type=file][name='product[manual_file]']"
+    assert_select "textarea[name='product[manual_reviews]']", false
+    assert_select "input[name='product[source_url]']", count: 1
   end
 
-  test "fails clearly when manual import has no usable review blocks" do
-    assert_difference -> { Product.count }, 1 do
-      assert_difference -> { IngestionRun.count }, 1 do
-        assert_no_difference -> { Review.count } do
+  test "creates manual import product and enqueues job from uploaded CSV" do
+    file = fixture_file_upload("manual_reviews.csv", "text/csv")
+
+    assert_enqueued_jobs 1, only: IngestManualReviewsJob do
+      assert_difference -> { Product.count }, 1 do
+        assert_difference -> { IngestionRun.count }, 1 do
           post products_path, params: {
             product: {
               import_mode: "manual",
-              name: "Empty Manual Import",
-              source_url: "https://example.com/empty",
-              manual_reviews: "\n\n \n\n"
+              name: "Manual CRM",
+              manual_file: file
             }
           }
         end
@@ -80,9 +34,47 @@ class ManualImportFlowTest < ActionDispatch::IntegrationTest
     ingestion_run = product.ingestion_runs.last
 
     assert_redirected_to product_path(product)
-    assert_predicate product, :failed?
-    assert_predicate ingestion_run, :failed?
-    assert_equal "No usable manual review blocks were provided.", product.ingestion_error
-    assert_equal "No usable manual review blocks were provided.", ingestion_run.error
+    assert_equal "manual", product.platform
+    assert_equal "Manual CRM", product.name
+    assert_nil product.source_url
+    assert_predicate product, :pending?
+    assert_predicate ingestion_run, :pending?
+    assert_predicate ingestion_run.reviews_file, :attached?
+    assert_equal "manual_reviews.csv", ingestion_run.reviews_file.filename.to_s
+  end
+
+  test "accepts manual import without a name and derives it from the filename" do
+    file = fixture_file_upload("manual_reviews.csv", "text/csv")
+
+    assert_difference -> { Product.count }, 1 do
+      post products_path, params: {
+        product: {
+          import_mode: "manual",
+          manual_file: file
+        }
+      }
+    end
+
+    product = Product.order(:created_at).last
+
+    assert_redirected_to product_path(product)
+    assert_equal "Manual reviews", product.name
+    assert_nil product.source_url
+    assert_equal "Manual reviews", product.display_name
+  end
+
+  test "rejects manual import without a file" do
+    assert_no_difference -> { Product.count } do
+      assert_no_difference -> { IngestionRun.count } do
+        post products_path, params: {
+          product: {
+            import_mode: "manual",
+            name: "Missing File"
+          }
+        }
+      end
+    end
+
+    assert_response :unprocessable_content
   end
 end

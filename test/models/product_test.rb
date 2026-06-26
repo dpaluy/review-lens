@@ -72,17 +72,25 @@ class ProductTest < ActiveSupport::TestCase
     assert_includes duplicate.errors[:external_id], "has already been taken"
   end
 
-  test "builds manual import identity without trustpilot validation" do
-    product = Product.new(
-      import_mode: Product::PLATFORM_MANUAL_IMPORT,
-      name: "Manual CRM",
-      source_url: "https://example.com/manual-crm-reviews"
-    )
+  test "builds manual import identity without trustpilot validation, source url, or name" do
+    product = Product.new(import_mode: Product::PLATFORM_MANUAL_IMPORT)
 
     assert product.valid?
     assert_predicate product, :manual_import?
     assert_equal Product::PLATFORM_MANUAL_IMPORT, product.platform
     assert_match(/\Amanual-/, product.external_id)
+    assert_nil product.source_url
+  end
+
+  test "display_name falls back to external id when name is blank" do
+    assert_equal "Example", products(:example).display_name
+
+    with_name = Product.new(import_mode: Product::PLATFORM_MANUAL_IMPORT, name: "Manual CRM")
+    assert_equal "Manual CRM", with_name.display_name
+
+    # Name is always derived at create time, so external_id only shows if it is somehow cleared.
+    without_name = Product.new(import_mode: Product::PLATFORM_MANUAL_IMPORT, name: nil, external_id: "manual-abc")
+    assert_equal "manual-abc", without_name.display_name
   end
 
   test "uses reviews count as usable review count" do

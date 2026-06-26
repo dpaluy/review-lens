@@ -32,5 +32,31 @@ module ReviewPlatforms
       assert_equal "Setup was simple.", reviews.first[:body]
       assert_equal "manual", reviews.first[:raw_payload].fetch(:import_mode)
     end
+
+    test "raises a clear error for an empty file" do
+      error = assert_raises(ManualAdapter::ParseError) do
+        ManualAdapter.new(source_url: "https://example.com/reviews").parse_reviews("\n\n  \n")
+      end
+
+      assert_equal "The uploaded file is empty.", error.message
+    end
+
+    test "raises a clear error for a body CSV with no usable rows" do
+      error = assert_raises(ManualAdapter::ParseError) do
+        ManualAdapter.new(source_url: "https://example.com/reviews").parse_reviews("title,body\n,\n,")
+      end
+
+      assert_equal "No reviews found in the CSV. Ensure it has a 'body' column with at least one non-empty review.", error.message
+    end
+
+    test "raises a clear error for a malformed CSV" do
+      malformed = "body,rating\n\"unterminated quote inside\n"
+
+      error = assert_raises(ManualAdapter::ParseError) do
+        ManualAdapter.new(source_url: "https://example.com/reviews").parse_reviews(malformed)
+      end
+
+      assert_equal "The CSV could not be parsed. Ensure the file is a valid CSV.", error.message
+    end
   end
 end

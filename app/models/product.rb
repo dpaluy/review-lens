@@ -9,7 +9,7 @@ class Product < ApplicationRecord
 
   MINIMUM_USABLE_REVIEW_COUNT = 20
 
-  attr_accessor :import_mode, :manual_reviews
+  attr_accessor :import_mode
 
   has_many :ingestion_runs, dependent: :destroy
   has_many :reviews, dependent: :destroy
@@ -28,9 +28,9 @@ class Product < ApplicationRecord
   before_validation :set_source_identity
   before_validation :set_manual_identity
 
-  validates :source_url, presence: true
+  validates :source_url, presence: true, unless: :manual_import?
   validates :platform, :external_id, presence: true, if: :supported_source_uri?
-  validates :platform, :external_id, :name, presence: true, if: :manual_import?
+  validates :platform, :external_id, presence: true, if: :manual_import?
   validates :external_id, uniqueness: { scope: :platform }, allow_nil: true
   validate :source_url_is_supported, unless: :manual_import?
 
@@ -74,6 +74,10 @@ class Product < ApplicationRecord
     import_mode == PLATFORM_MANUAL_IMPORT || self.class.manual_import_platform?(platform)
   end
 
+  def display_name
+    name.presence || external_id
+  end
+
   def thin_corpus?
     ready? && usable_review_count < MINIMUM_USABLE_REVIEW_COUNT
   end
@@ -114,7 +118,7 @@ class Product < ApplicationRecord
     return unless manual_import?
 
     self.platform = PLATFORM_MANUAL_IMPORT
-    self.source_url = source_url.to_s.strip
+    self.source_url = source_url.presence
     self.external_id ||= "manual-#{SecureRandom.uuid}"
   end
 
