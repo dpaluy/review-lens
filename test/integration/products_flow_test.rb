@@ -194,7 +194,24 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
       assert_select "p", /Ingestion failed/
       assert_select "p", "Fetch blocked by remote host"
     end
+    assert_select "[data-testid='ingestion-step-pending'][data-state='done']"
+    assert_select "[data-testid='ingestion-step-fetching'][data-state='failed']"
+    assert_select "[data-testid='ingestion-step-parsing'][data-state='todo']"
     assert_select "li", "Trustpilot returned a blocking page before parsing"
+  end
+
+  test "shows parser failures on parsing step" do
+    ingestion_runs(:failed).update!(
+      pages_succeeded: 1,
+      error: IngestReviewsJob::NO_USABLE_REVIEWS_MESSAGE
+    )
+
+    get product_path(products(:failed))
+
+    assert_response :success
+    assert_select "[data-testid='ingestion-step-pending'][data-state='done']"
+    assert_select "[data-testid='ingestion-step-fetching'][data-state='done']"
+    assert_select "[data-testid='ingestion-step-parsing'][data-state='failed']"
   end
 
   test "renders parser warnings on product status page" do
