@@ -3,7 +3,6 @@ require "digest"
 module Ingestion
   class Importer
     MAX_BODY_LENGTH = 5_000
-    THIN_CORPUS_THRESHOLD = 20
 
     Result = Data.define(:imported, :skipped)
 
@@ -79,13 +78,7 @@ module Ingestion
       end
 
       def update_product_summary
-        usable_review_count = product.reviews.count
-        summary = product.ingestion_summary.merge(
-          "usable_review_count" => usable_review_count,
-          "corpus_quality" => usable_review_count < THIN_CORPUS_THRESHOLD ? "thin" : "viable"
-        )
-
-        product.update_column(:ingestion_summary, summary)
+        SummaryBuilder.new(product:).call
       end
 
       def skip_review
