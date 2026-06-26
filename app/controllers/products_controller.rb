@@ -24,7 +24,7 @@ class ProductsController < ApplicationController
       create_url_import
     end
 
-    redirect_to @product
+    redirect_to @product unless performed?
   rescue ActiveRecord::RecordInvalid => error
     @product = error.record
     render :new, status: :unprocessable_content
@@ -44,17 +44,31 @@ class ProductsController < ApplicationController
     end
 
     def create_manual_import
-      Product.transaction do
+      file = product_params[:manual_file]
+      unless file.respond_to?(:read)
         @product = Product.new(manual_product_params.merge(import_mode: Product::MANUAL_PLATFORM))
+        @product.errors.add(:manual_file, "must be attached")
+        render :new, status: :unprocessable_content
+        return
+      end
+
+      Product.transaction do
+        @product = Product.new(
+          manual_product_params.merge(
+            import_mode: Product::MANUAL_PLATFORM,
+            name: manual_name_from(file)
+          )
+        )
         @product.save!
         ingestion_run = @product.ingestion_runs.create!
+        ingestion_run.reviews_file.attach(file)
 
-        Ingestion::ManualImport.new(
-          product: @product,
-          ingestion_run:,
-          pasted_reviews: product_params[:manual_reviews]
-        ).call
+        IngestManualReviewsJob.perform_later(ingestion_run)
       end
+    end
+
+    def manual_name_from(file)
+      product_params[:name].presence || File.basename(file.original_filename.to_s, ".*").presence&.humanize
     end
 
     def manual_import?
@@ -62,11 +76,11 @@ class ProductsController < ApplicationController
     end
 
     def product_params
-      params.require(:product).permit(:import_mode, :name, :source_url, :manual_reviews)
+      params.require(:product).permit(:import_mode, :name, :source_url, :manual_file)
     end
 
     def manual_product_params
-      product_params.slice(:name, :source_url)
+      product_params.slice(:name)
     end
 
     def compute_field_coverage

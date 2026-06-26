@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_035725) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -141,7 +141,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_035725) do
     t.jsonb "rating_distribution", default: {}, null: false
     t.integer "reviews_count", default: 0, null: false
     t.jsonb "sentiment_distribution", default: {}, null: false
-    t.text "source_url", null: false
+    t.text "source_url"
     t.datetime "updated_at", null: false
     t.index ["ingestion_status"], name: "index_products_on_ingestion_status"
     t.index ["platform", "external_id"], name: "index_products_on_platform_and_external_id", unique: true
@@ -161,7 +161,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_035725) do
     t.string "reviewer_label"
     t.string "reviewer_role"
     t.string "sentiment", default: "unknown", null: false
-    t.text "source_url", null: false
+    t.text "source_url"
     t.text "title"
     t.datetime "updated_at", null: false
     t.index ["product_id", "content_hash"], name: "index_reviews_on_product_id_and_content_hash", unique: true

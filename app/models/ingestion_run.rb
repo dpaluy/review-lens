@@ -2,6 +2,7 @@ class IngestionRun < ApplicationRecord
   WARNING_MESSAGE_KEYS = %w[message detail title code].freeze
 
   belongs_to :product
+  has_one_attached :reviews_file
 
   enum :status, {
     pending: "pending",

@@ -1,19 +1,24 @@
 module Ingestion
   class ManualImport
     NO_USABLE_REVIEWS_ERROR = "No usable manual review blocks were provided."
+    MISSING_FILE_ERROR = "No reviews file was attached to this ingestion run."
     SUMMARIZATION_FAILURE_MESSAGE = "Review summarization failed: %s"
 
-    def initialize(product:, ingestion_run:, pasted_reviews:)
+    def initialize(product:, ingestion_run:)
       @product = product
       @ingestion_run = ingestion_run
-      @pasted_reviews = pasted_reviews
     end
 
     def call
+      return mark_failed(MISSING_FILE_ERROR) unless @ingestion_run.reviews_file.attached?
+
       @product.update!(ingestion_status: "parsing", ingestion_error: nil)
       @ingestion_run.update!(status: "parsing", started_at: Time.current, parser_version: "manual-v1")
 
-      reviews = ReviewPlatforms::ManualAdapter.new(source_url: @product.source_url).parse_reviews(@pasted_reviews)
+      reviews = ReviewPlatforms::ManualAdapter
+        .new(source_url: @product.source_url)
+        .parse_reviews(@ingestion_run.reviews_file.download)
+
       import_result = Ingestion::Importer.import(@product, reviews)
 
       @ingestion_run.update!(

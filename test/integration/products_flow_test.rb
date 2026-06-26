@@ -72,68 +72,17 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     assert_not_includes response.body, "External can't be blank"
   end
 
-  test "creates manual import product with pasted review blocks" do
-    pasted_reviews = <<~TEXT
-      Setup was simple and support answered quickly.
+  test "creates manual import product and enqueues job from uploaded CSV" do
+    file = fixture_file_upload("manual_reviews.csv", "text/csv")
 
-
-      Billing was confusing and cancellation took too long.
-
-      Setup was simple and support answered quickly.
-
-    TEXT
-
-    with_fake_batch_summary_client do |client|
+    assert_enqueued_jobs 1, only: IngestManualReviewsJob do
       assert_difference -> { Product.count }, 1 do
         assert_difference -> { IngestionRun.count }, 1 do
-          assert_difference -> { Review.count }, 2 do
-            assert_difference -> { InsightBatch.count }, 1 do
-              post products_path, params: {
-                product: {
-                  import_mode: "manual",
-                  name: "Manual CRM",
-                  source_url: "https://example.com/manual-crm-reviews",
-                  manual_reviews: pasted_reviews
-                }
-              }
-            end
-          end
-        end
-      end
-
-      assert_equal 1, client.calls.size
-    end
-
-    product = Product.order(:created_at).last
-    ingestion_run = product.ingestion_runs.last
-
-    assert_redirected_to product_path(product)
-    assert_equal "manual", product.platform
-    assert_equal "Manual CRM", product.name
-    assert_equal "https://example.com/manual-crm-reviews", product.source_url
-    assert_predicate product, :ready?
-    assert_predicate ingestion_run, :ready?
-    assert_equal 3, ingestion_run.reviews_found
-    assert_equal 2, ingestion_run.reviews_imported
-    assert_equal 1, ingestion_run.reviews_skipped
-    assert_equal 2, product.reviews_count
-    assert_equal 1, product.insight_batches.count
-    assert_equal [
-      "Billing was confusing and cancellation took too long.",
-      "Setup was simple and support answered quickly."
-    ], product.reviews.order(:body).pluck(:body)
-  end
-
-  test "manual import skips empty blocks and fails clearly without reviews" do
-    assert_difference -> { Product.count }, 1 do
-      assert_difference -> { IngestionRun.count }, 1 do
-        assert_no_difference -> { Review.count } do
           post products_path, params: {
             product: {
               import_mode: "manual",
-              name: "Empty Manual Import",
-              source_url: "https://example.com/empty",
-              manual_reviews: "\n\n  \n\n"
+              name: "Manual CRM",
+              manual_file: file
             }
           }
         end
@@ -144,10 +93,27 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     ingestion_run = product.ingestion_runs.last
 
     assert_redirected_to product_path(product)
-    assert_predicate product, :failed?
-    assert_predicate ingestion_run, :failed?
-    assert_equal "No usable manual review blocks were provided.", product.ingestion_error
-    assert_equal "No usable manual review blocks were provided.", ingestion_run.error
+    assert_equal "manual", product.platform
+    assert_equal "Manual CRM", product.name
+    assert_nil product.source_url
+    assert_predicate product, :pending?
+    assert_predicate ingestion_run, :pending?
+    assert_predicate ingestion_run.reviews_file, :attached?
+  end
+
+  test "manual import rejects missing file without creating records" do
+    assert_no_difference -> { Product.count } do
+      assert_no_difference -> { IngestionRun.count } do
+        post products_path, params: {
+          product: {
+            import_mode: "manual",
+            name: "Empty Manual Import"
+          }
+        }
+      end
+    end
+
+    assert_response :unprocessable_content
   end
 
   test "does not fake ingestion run status when run is missing" do

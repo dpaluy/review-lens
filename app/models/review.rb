@@ -11,7 +11,7 @@ class Review < ApplicationRecord
   before_validation :normalize_external_review_id
   before_validation :derive_sentiment_from_rating
 
-  validates :content_hash, :source_url, :body, presence: true
+  validates :content_hash, :body, presence: true
   validates :content_hash, uniqueness: { scope: :product_id }
   validates :external_review_id, uniqueness: { scope: :product_id }, allow_nil: true
 
