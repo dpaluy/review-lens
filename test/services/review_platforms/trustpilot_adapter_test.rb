@@ -24,6 +24,12 @@ class ReviewPlatforms::TrustpilotAdapterTest < ActiveSupport::TestCase
     assert_not_includes review_bodies, "Reviewers say QuickBooks has support and billing concerns."
   end
 
+  test "parses product metadata" do
+    metadata = adapter.parse_product_metadata(file_fixture("trustpilot_viable_corpus.html").read)
+
+    assert_equal "LedgerFlow", metadata[:name]
+  end
+
   private
     def adapter
       ReviewPlatforms::TrustpilotAdapter.new
