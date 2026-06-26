@@ -79,7 +79,9 @@ module Ingestion
       end
 
       def rating_distribution(rated_reviews)
-        rated_reviews.group(:rating).count.transform_keys(&:to_s)
+        rated_reviews.group(:rating).count.transform_keys do |rating|
+          rating.to_i == rating ? rating.to_i.to_s : rating.to_s
+        end
       end
   end
 end
