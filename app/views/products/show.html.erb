@@ -11,8 +11,18 @@
   has_warning_messages = @ingestion_run.warning_messages.any?
   show_warnings = has_warning_messages || (sec_full && skipped > 0)
 
-  steps     = %w[pending fetching parsing summarizing ready]
-  cur_idx   = steps.index(pipeline) || 0
+  steps = %w[pending fetching parsing summarizing ready]
+  failed_pipeline =
+    if @product.reviews_count.to_i.positive? || @ingestion_run.reviews_imported.to_i.positive?
+      "summarizing"
+    elsif @ingestion_run.pages_succeeded.to_i.positive?
+      "parsing"
+    elsif @ingestion_run.pages_attempted.to_i.positive?
+      "fetching"
+    else
+      "pending"
+    end
+  cur_idx = steps.index(sec_failed ? failed_pipeline : pipeline) || 0
 %>
 
 <% if sec_skeleton %>
@@ -75,11 +85,7 @@
         <%# Background progress line %>
         <div style="position:absolute;top:16px;left:16px;right:16px;height:2px;background:#f0f0ee;z-index:0;"></div>
         <%
-          line_pct = if sec_failed
-            12
-          else
-            cur_idx == 0 ? 0 : (cur_idx.to_f / 4 * 100).round
-          end
+          line_pct = cur_idx == 0 ? 0 : (cur_idx.to_f / 4 * 100).round
         %>
         <div style="position:absolute;top:16px;left:16px;height:2px;background:#1f8a5b;z-index:1;width:<%= line_pct %>%;transition:width 0.4s;"></div>
 
@@ -110,7 +116,7 @@
               else               "font-size:11px;color:#8a9099;margin-top:6px;text-align:center;"
               end
             %>
-            <div style="display:flex;flex-direction:column;align-items:center;">
+            <div data-testid="ingestion-step-<%= key %>" data-state="<%= step_state %>" style="display:flex;flex-direction:column;align-items:center;">
               <div style="<%= circle_style %>">
                 <% if step_state == "done" %>&#10003;<% elsif step_state == "failed" %>&#10005;<% end %>
               </div>

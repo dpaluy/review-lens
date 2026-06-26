@@ -11,7 +11,7 @@ branches.
 - Prototype repository URL: `https://github.com/dpaluy/reviewlens-prototype/tree/main`
 - Demo data source: `https://www.trustpilot.com/review/quickbooks.intuit.com`
 - Primary path works from a fresh browser session.
-- Background worker is running in production.
+- Solid Queue supervisor is running inside Puma in production.
 - PostgreSQL-backed persistence survives a page refresh.
 
 ## Demo Flow

@@ -1172,8 +1172,7 @@ Use:
 * 1 DigitalOcean Droplet
 * Docker via Kamal
 * PostgreSQL as Kamal accessory or DO Managed PostgreSQL
-* Rails web process
-* Rails job process
+* Rails web process with Solid Queue running inside Puma
 * Public domain/subdomain
 
 For a hiring exercise, single Droplet + Postgres accessory is acceptable. Managed Postgres is cleaner but costs more and adds setup time.
@@ -1181,8 +1180,7 @@ For a hiring exercise, single Droplet + Postgres accessory is acceptable. Manage
 ## Processes
 
 ```text
-web: bin/rails server
-worker: bin/jobs
+web: SOLID_QUEUE_IN_PUMA=true bin/rails server
 ```
 
 ## Required env vars
@@ -1193,6 +1191,7 @@ DATABASE_URL
 OPENAI_API_KEY
 RUBYLLM_MODEL
 RAILS_ENV=production
+SOLID_QUEUE_IN_PUMA=true
 ```
 
 ## Kamal files
@@ -1212,10 +1211,6 @@ image: your-docker-user/reviewlens-ai
 servers:
   web:
     - YOUR_DROPLET_IP
-  job:
-    hosts:
-      - YOUR_DROPLET_IP
-    cmd: bin/jobs
 
 proxy:
   ssl: true
@@ -1271,7 +1266,7 @@ kamal accessory boot postgres
 ```bash
 kamal app logs
 kamal app exec "bin/rails runner 'puts Product.count'"
-kamal app exec "bin/jobs --version"
+kamal app exec "bin/rails runner 'puts ENV.fetch(%q[SOLID_QUEUE_IN_PUMA])'"
 ```
 
 ---

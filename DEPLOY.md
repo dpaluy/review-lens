@@ -1,8 +1,8 @@
 # Deployment Guide
 
 ReviewLens deploys to DigitalOcean with Kamal 2: a single Droplet runs the web
-server (Puma behind kamal-proxy) and a dedicated Solid Queue worker, plus a
-PostgreSQL accessory for the four Rails databases (primary + Cache/Queue/Cable).
+server (Puma behind kamal-proxy) with Solid Queue inside Puma, plus a PostgreSQL
+accessory for the four Rails databases (primary + Cache/Queue/Cable).
 
 ## Prerequisites
 
@@ -113,7 +113,7 @@ bin/kamal setup
 2. Start the `postgres:16` accessory and run `config/postgres/init.sql` to create
    the Cache/Queue/Cable databases.
 3. Build and push the image to `registry.digitalocean.com/reviewlens`.
-4. Launch the `web` and `job` roles.
+4. Launch the `web` role. Puma also starts the Solid Queue supervisor.
 5. Provision a Let's Encrypt certificate via kamal-proxy.
 
 Verify: `curl -I https://app.cairnfoundry.com/up` should return `200 OK`.
@@ -128,7 +128,6 @@ bin/kamal rollback <version>     # roll back to a prior version
 
 bin/kamal console                # Rails console on the server
 bin/kamal logs                   # tail web logs
-bin/kamal job-logs               # tail Solid Queue worker logs
 bin/kamal accessory logs db      # tail Postgres logs
 bin/kamal dbc                    # Rails dbconsole
 ```

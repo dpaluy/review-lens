@@ -15,16 +15,12 @@ service: review_lens
 # subscription name if different.
 image: reviewlens/review_lens
 
-# Two processes per the PRD: a web server (Puma behind Thruster/kamal-proxy)
-# and a dedicated Solid Queue worker. They share env, secrets, and storage.
+# Single-server demo topology: Puma handles web requests and runs Solid Queue
+# through its plugin so enqueued ingestion jobs are processed by the web service.
 servers:
   web:
     hosts:
       - app.cairnfoundry.com
-  job:
-    hosts:
-      - app.cairnfoundry.com
-    cmd: bin/jobs
 
 # kamal-proxy terminates SSL via Let's Encrypt and does zero-downtime rolling
 # restarts. Requires config.assume_ssl + config.force_ssl in production.rb.
@@ -47,8 +43,8 @@ registry:
 env:
   clear:
     RAILS_ENV: production
-    # Worker runs in its own container, not inside Puma.
-    SOLID_QUEUE_IN_PUMA: false
+    # Run Solid Queue inside Puma so ingestion does not depend on a separate job role.
+    SOLID_QUEUE_IN_PUMA: true
     # Postgres host for the Solid Cache/Queue/Cable databases.
     DB_HOST: <%= ENV.fetch("DB_HOST", "review_lens-db") %>
     OPENAI_MODEL: <%= ENV.fetch("OPENAI_MODEL", "gpt-4o-mini") %>
@@ -83,7 +79,6 @@ aliases:
   console: app exec --interactive --reuse "bin/rails console"
   shell: app exec --interactive --reuse "bash"
   logs: app logs -f
-  job-logs: app logs -f -r job
   dbc: app exec --interactive --reuse "bin/rails dbconsole --include-password"
 
 # Bridge fingerprinted assets between versions to avoid 404s on in-flight requests.
