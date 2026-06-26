@@ -1,0 +1,192 @@
+---
+- name: Configure ReviewLens production Droplet
+  hosts: all
+  become: true
+  vars:
+    swap_file_size_mb: 2048
+    # Filled from provision script / group_vars at runtime.
+    backup_bucket: "{{ backup_bucket | default('reviewlens-backups') }}"
+    spaces_region: "{{ spaces_region | default('nyc3') }}"
+
+  roles:
+    - geerlingguy.swap
+
+  tasks:
+    # ---- Docker ----
+    - name: Install Docker prerequisites
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: true
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        state: present
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+        state: present
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Start and enable Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: true
+
+    # ---- fail2ban ----
+    - name: Install fail2ban
+      apt:
+        name: fail2ban
+        state: present
+
+    - name: Configure fail2ban SSH jail
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [sshd]
+          enabled = true
+          port = 22
+          filter = sshd
+          logpath = /var/log/auth.log
+          maxretry = 3
+          bantime = 3600
+          findtime = 600
+        mode: "0644"
+      notify: Restart fail2ban
+
+    - name: Start and enable fail2ban
+      systemd:
+        name: fail2ban
+        state: started
+        enabled: true
+
+    # ---- SSH hardening ----
+    - name: Harden SSH configuration
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.line }}"
+        state: present
+      loop:
+        - { regexp: '^#?PermitRootLogin', line: 'PermitRootLogin prohibit-password' }
+        - { regexp: '^#?PasswordAuthentication', line: 'PasswordAuthentication no' }
+        - { regexp: '^#?PubkeyAuthentication', line: 'PubkeyAuthentication yes' }
+        - { regexp: '^#?PermitEmptyPasswords', line: 'PermitEmptyPasswords no' }
+        - { regexp: '^#?X11Forwarding', line: 'X11Forwarding no' }
+        - { regexp: '^#?MaxAuthTries', line: 'MaxAuthTries 3' }
+        - { regexp: '^#?ClientAliveInterval', line: 'ClientAliveInterval 300' }
+        - { regexp: '^#?ClientAliveCountMax', line: 'ClientAliveCountMax 2' }
+      notify: Restart SSH
+
+    # ---- NTP ----
+    - name: Install chrony for NTP
+      apt:
+        name: chrony
+        state: present
+
+    - name: Start and enable chrony
+      systemd:
+        name: chrony
+        state: started
+        enabled: true
+
+    # ---- Kernel tuning ----
+    - name: Apply kernel tuning for production
+      sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        state: present
+        sysctl_file: /etc/sysctl.d/99-reviewlens.conf
+        reload: true
+      loop:
+        - { name: 'vm.swappiness', value: '10' }
+        - { name: 'net.core.somaxconn', value: '65535' }
+        - { name: 'net.ipv4.tcp_max_syn_backlog', value: '65535' }
+        - { name: 'net.ipv4.ip_local_port_range', value: '1024 65535' }
+        - { name: 'fs.file-max', value: '2097152' }
+
+    # ---- Automatic security updates ----
+    - name: Install unattended-upgrades
+      apt:
+        name: unattended-upgrades
+        state: present
+
+    - name: Enable automatic security updates
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::AutocleanInterval "7";
+        mode: "0644"
+
+    # ---- Postgres backup to DO Spaces ----
+    # boto3 for Spaces (S3-compatible) uploads, in an isolated venv because
+    # Ubuntu 24.04 blocks system-wide pip installs (PEP 668).
+    - name: Install python3-venv
+      apt:
+        name: python3-venv
+        state: present
+
+    - name: Create venv for backup tooling
+      command: python3 -m venv /opt/reviewlens/venv
+        creates=/opt/reviewlens/venv/bin/python
+
+    - name: Install boto3 into venv
+      command: /opt/reviewlens/venv/bin/pip install --quiet boto3
+        creates=/opt/reviewlens/venv/lib/python*/site-packages/boto3
+
+    - name: Create backup directory
+      file:
+        path: /opt/reviewlens
+        state: directory
+        mode: "0750"
+
+    - name: Install pg_dump backup script
+      copy:
+        dest: /opt/reviewlens/pg_backup.sh
+        src: files/pg_backup.sh
+        mode: "0750"
+
+    - name: Write Spaces credentials for backup job
+      template:
+        dest: /opt/reviewlens/spaces.env
+        src: templates/spaces.env.j2
+        mode: "0600"
+      no_log: true
+
+    - name: Schedule nightly Postgres backup (02:00 UTC)
+      cron:
+        name: "reviewlens pg_dump backup"
+        minute: "0"
+        hour: "2"
+        job: "/opt/reviewlens/pg_backup.sh >> /var/log/reviewlens-backup.log 2>&1"
+
+  handlers:
+    - name: Restart fail2ban
+      systemd:
+        name: fail2ban
+        state: restarted
+
+    - name: Restart SSH
+      systemd:
+        name: sshd
+        state: restarted

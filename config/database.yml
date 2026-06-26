@@ -90,6 +90,7 @@ production:
     database: review_lens_production
     username: review_lens
     password: <%= ENV["REVIEW_LENS_DATABASE_PASSWORD"] %>
+    host: <%= ENV.fetch("DB_HOST", "review_lens-db") %>
   cache:
     <<: *primary_production
     database: review_lens_production_cache

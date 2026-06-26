@@ -1,0 +1,9 @@
+# Local OpenTofu state and var files. Never commit (may contain secrets).
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfstate*
+terraform.tfvars
+*.auto.tfvars
+.terraform/
+.terraform.lock.hcl
