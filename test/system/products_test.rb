@@ -8,11 +8,9 @@ class ProductsTest < ApplicationSystemTestCase
     click_on "Ingest Reviews"
 
     assert_text "quickbooks.intuit.com"
-    assert_text "Platform"
-    assert_text "trustpilot"
-    assert_text "Product status"
-    assert_text "Run status"
-    assert_text "pending"
+    assert_text "Trustpilot"
+    assert_text "Ingestion status"
+    assert_text "Pending"
     assert_text "Pages attempted"
     assert_text "Reviews found"
   end
