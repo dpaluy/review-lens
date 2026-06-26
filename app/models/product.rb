@@ -50,11 +50,11 @@ class Product < ApplicationRecord
   def self.source_identity(source_url)
     normalized_source_url = source_url.to_s.strip
     source_uri = parse_source_uri(normalized_source_url)
-    slug = product_slug(source_uri)
+    external_id = source_external_id(source_uri)
 
-    return unless source_uri.is_a?(URI::HTTP) && SUPPORTED_HOSTS.include?(source_uri.host.to_s.downcase) && slug.present?
+    return unless source_uri.is_a?(URI::HTTP) && SUPPORTED_HOSTS.include?(source_uri.host.to_s.downcase) && external_id.present?
 
-    { source_url: normalized_source_url, external_id: slug }
+    { source_url: normalized_source_url, external_id: }
   end
 
   def manual_import?
@@ -68,7 +68,7 @@ class Product < ApplicationRecord
       nil
     end
 
-    def self.product_slug(source_uri)
+    def self.source_external_id(source_uri)
       return unless source_uri
 
       segments = source_uri.path.split("/").reject(&:blank?)
@@ -105,7 +105,7 @@ class Product < ApplicationRecord
         errors.add :source_url, "must be HTTP or HTTPS"
       elsif !SUPPORTED_HOSTS.include?(source_uri.host.downcase)
         errors.add :source_url, "must be Trustpilot URL"
-      elsif self.class.product_slug(source_uri).blank?
+      elsif self.class.source_external_id(source_uri).blank?
         errors.add :source_url, "must include Trustpilot review target"
       end
     end
