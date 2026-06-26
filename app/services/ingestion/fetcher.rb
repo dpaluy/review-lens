@@ -8,6 +8,7 @@ module Ingestion
     TIMEOUT_SECONDS = 10
     MAX_BYTES = 5.megabytes
     REDIRECT_STATUSES = [ 301, 302, 303, 307, 308 ].freeze
+    BLOCKED_HTTP_STATUSES = [ 403, 429 ].freeze
 
     Result = Struct.new(:successful, :body, :metadata, :error_code, keyword_init: true) do
       def success?
@@ -47,6 +48,10 @@ module Ingestion
 
           uri = redirect_uri
           next
+        end
+
+        unless success_status?(status)
+          return failure(http_error_code(status), metadata.merge(final_url: uri.to_s))
         end
 
         body = response.body.to_s
@@ -126,6 +131,16 @@ module Ingestion
 
     def redirect_status?(status)
       REDIRECT_STATUSES.include?(status)
+    end
+
+    def success_status?(status)
+      status.between?(200, 299)
+    end
+
+    def http_error_code(status)
+      return "blocked" if BLOCKED_HTTP_STATUSES.include?(status)
+
+      "http_#{status}"
     end
 
     def resolve_redirect(current_uri, location)
