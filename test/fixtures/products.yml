@@ -42,6 +42,17 @@ ready:
   sentiment_distribution: {}
   ingestion_summary: {}
 
+thin_corpus:
+  platform: trustpilot
+  source_url: https://www.trustpilot.com/review/thin.example.com
+  external_id: thin.example.com
+  name: Thin Corpus Example
+  ingestion_status: ready
+  reviews_count: 4
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}
+
 failed:
   platform: trustpilot
   source_url: https://www.trustpilot.com/review/failed.example.com
@@ -49,6 +60,17 @@ failed:
   name: Failed Example
   ingestion_status: failed
   ingestion_error: Fetch blocked by remote host
+  reviews_count: 0
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}
+
+missing_status_details:
+  platform: trustpilot
+  source_url: https://www.trustpilot.com/review/missing-status.example.com
+  external_id: missing-status.example.com
+  name: Missing Status Details
+  ingestion_status: pending
   reviews_count: 0
   rating_distribution: {}
   sentiment_distribution: {}
