@@ -26,6 +26,7 @@ KEEP_MANIFESTS = Integer(ENV.fetch("DOCR_KEEP_MANIFESTS", "1"), 10)
 DRY_RUN = ENV.fetch("DRY_RUN", "0") == "1"
 SKIP_GC = ENV.fetch("SKIP_GC", "0") == "1"
 WAIT_GC = ENV.fetch("DOCR_WAIT_GC", "1") == "1"
+FORCE_GC = ENV.fetch("FORCE_GC", "0") == "1"
 GC_WAIT_SECONDS = Integer(ENV.fetch("DOCR_GC_WAIT_SECONDS", "1200"), 10)
 GC_POLL_SECONDS = Integer(ENV.fetch("DOCR_GC_POLL_SECONDS", "10"), 10)
 DO_TOKEN_REF = ENV.fetch("DO_TOKEN_REF", "op://reviewlens/digitalocean/credential")
@@ -222,6 +223,7 @@ protected_manifests.each do |manifest|
 end
 
 manifests_to_delete = manifests.reject { |manifest| protected_digests.include?(manifest.fetch("digest")) }
+deleted_manifests = false
 
 if manifests_to_delete.empty?
   puts "No old manifests to delete."
@@ -234,10 +236,13 @@ elsif DRY_RUN
   end
 else
   delete_manifests(manifests_to_delete)
+  deleted_manifests = true
 end
 
 if DRY_RUN
   puts "Skipping garbage collection in dry run."
-else
+elsif deleted_manifests || FORCE_GC
   start_gc
+else
+  puts "Skipping garbage collection because no manifests were deleted. Use FORCE_GC=1 to run it anyway."
 end
