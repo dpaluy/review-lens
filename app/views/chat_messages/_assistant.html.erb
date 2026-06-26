@@ -9,27 +9,9 @@
 
   <div id="chat_message_<%= assistant.id %>_content" class="rl-markdown"><%= format_markdown(assistant.content) %></div>
 
-  <% if metadata.present? %>
+  <% if metadata["supporting_review_ids"].present? %>
     <div class="space-y-2 text-sm text-gray-700">
-      <% if metadata["answer_status"].present? %>
-        <p>Status: <%= metadata["answer_status"] %></p>
-      <% end %>
-
-      <% if metadata["confidence"].present? %>
-        <p>Confidence: <%= metadata["confidence"] %></p>
-      <% end %>
-
-      <% if metadata["supporting_review_ids"].present? %>
-        <p>Supporting reviews: <%= metadata["supporting_review_ids"].join(", ") %></p>
-      <% end %>
-
-      <% if metadata["blocked_category"].present? %>
-        <p>Blocked category: <%= metadata["blocked_category"] %></p>
-      <% end %>
-
-      <% if metadata["limitations"].present? %>
-        <p>Limitations: <%= metadata["limitations"].join("; ") %></p>
-      <% end %>
+      <p>Supporting reviews: <%= metadata["supporting_review_ids"].join(", ") %></p>
     </div>
   <% end %>
 

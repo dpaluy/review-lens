@@ -19,12 +19,12 @@ class IngestionStatusTest < ActionDispatch::IntegrationTest
     end
   end
 
-  test "shows thin corpus warning for ready products with fewer than twenty usable reviews" do
+  test "shows thin review set warning for ready products with fewer than twenty usable reviews" do
     get product_path(products(:thin_corpus))
 
     assert_response :success
     assert_select "[data-testid='thin-corpus-warning'][role='alert']" do
-      assert_select "p", /Thin corpus/
+      assert_select "p", /Thin review set/
       assert_select "p", "Only 4 usable reviews available. ReviewLens needs least 20 usable reviews for grounded answers."
     end
   end

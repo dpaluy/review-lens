@@ -524,8 +524,8 @@
           </div>
           <p>
             ReviewLens AI is intentionally narrow. It is not a generic chatbot or crawler.
-            The demo-critical path is one product corpus, captured from Trustpilot or manual import,
-            then queried through a product-scoped grounded Q&amp;A service.
+            The demo-critical path is one product review set, captured from Trustpilot or manual import,
+            then queried through product-scoped grounded Q&amp;A on <span class="inline-code">/products/:id</span>.
           </p>
         </div>
 
@@ -586,7 +586,7 @@
             <div class="arrow">&lt;-&gt;</div>
             <div class="box">
               <strong>Active Job / Solid Queue</strong>
-              <span><span class="inline-code">IngestReviewsJob</span> and <span class="inline-code">ConversationResponseJob</span> run through database-backed queueing.</span>
+              <span><span class="inline-code">IngestReviewsJob</span>, <span class="inline-code">ProductConversationResponseJob</span>, and <span class="inline-code">ConversationResponseJob</span> run through database-backed queueing.</span>
             </div>
             <div class="arrow">&lt;-&gt;</div>
             <div class="box">
@@ -615,16 +615,16 @@
             <ol class="flow">
               <li><span class="step-number">1</span><span><strong>Create product</strong><span><span class="inline-code">POST /products</span> validates Trustpilot URL and creates an ingestion run.</span></span></li>
               <li><span class="step-number">2</span><span><strong>Fetch public HTML</strong><span><span class="inline-code">Ingestion::Fetcher</span> allows only Trustpilot hosts, two redirects, ten seconds, five MB.</span></span></li>
-              <li><span class="step-number">3</span><span><strong>Probe and parse</strong><span><span class="inline-code">TrustpilotProbe</span> detects thin corpus or blocking, then <span class="inline-code">TrustpilotAdapter</span> extracts review cards.</span></span></li>
+              <li><span class="step-number">3</span><span><strong>Probe and parse</strong><span><span class="inline-code">TrustpilotProbe</span> detects thin review sets or blocking, then <span class="inline-code">TrustpilotAdapter</span> extracts review cards.</span></span></li>
               <li><span class="step-number">4</span><span><strong>Normalize reviews</strong><span><span class="inline-code">Ingestion::Importer</span> truncates long bodies, deduplicates by external ID or content hash, updates product summary.</span></span></li>
-              <li><span class="step-number">5</span><span><strong>Summarize corpus</strong><span><span class="inline-code">BatchSummarizer</span> stores structured 30-review insight batches and marks product ready.</span></span></li>
+              <li><span class="step-number">5</span><span><strong>Summarize reviews</strong><span><span class="inline-code">BatchSummarizer</span> stores structured 30-review insight batches and marks product ready.</span></span></li>
             </ol>
           </div>
 
           <div>
             <h3>Grounded Q&amp;A Flow</h3>
             <ol class="flow">
-              <li><span class="step-number">1</span><span><strong>Ask from product</strong><span>Product chat creates a product-linked <span class="inline-code">Conversation</span> and enqueues response generation.</span></span></li>
+              <li><span class="step-number">1</span><span><strong>Ask from product</strong><span>Product chat reuses one persisted <span class="inline-code">Conversation</span> per product on <span class="inline-code">/products/:id</span>, backed by a unique product conversation index, and enqueues response generation without redirecting to <span class="inline-code">/conversations/:id</span>.</span></span></li>
               <li><span class="step-number">2</span><span><strong>Scope first</strong><span><span class="inline-code">ScopeGuard</span> blocks weather, competitor comparisons, other review sources, and outside knowledge.</span></span></li>
               <li><span class="step-number">3</span><span><strong>Build context</strong><span><span class="inline-code">ContextBuilder</span> combines product summary, insight batches, and up to 50 keyword-matched reviews.</span></span></li>
               <li><span class="step-number">4</span><span><strong>Answer with schema</strong><span><span class="inline-code">QuestionAnswerer</span> asks RubyLLM for answer markdown, confidence, limitations, and review IDs.</span></span></li>
@@ -669,7 +669,7 @@
           </article>
           <article class="node accent-blue">
             <h3>Generic Chat Foundation</h3>
-            <p><code>/conversations</code> also supports generic RubyLLM chat. That is separate from the product-scoped demo path and should not be confused with guarded review Q&amp;A.</p>
+            <p><code>/internal/conversations</code> keeps the generated RubyLLM chat scaffold available for development only. Product-scoped prompts are rejected from that path so guarded review Q&amp;A stays on <code>/products/:id</code> through <code>ProductConversationResponseJob</code> and a product-specific Turbo stream.</p>
           </article>
         </div>
       </section>
@@ -723,9 +723,9 @@
               </tr>
               <tr>
                 <td><strong>conversations</strong></td>
-                <td>Chat session, optionally tied to a product.</td>
+                <td>Chat session, unique when tied to a product.</td>
                 <td>product_id, ai_model_id, timestamps.</td>
-                <td>Product is optional, enabling generic chat and product-scoped chat.</td>
+                <td>Unique non-null product_id enforces one product Q&amp;A conversation; generic chats keep product_id null.</td>
               </tr>
               <tr>
                 <td><strong>chat_messages</strong></td>

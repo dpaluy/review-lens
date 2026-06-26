@@ -19,11 +19,62 @@ class ReviewAnalysis::ScopeGuardTest < ActiveSupport::TestCase
     assert_equal "allowed", result.blocked_category
     assert_equal "Which features do reviewers praise?", result.safe_rewritten_question
     assert_equal 1, client.calls.size
-    assert_includes client.calls.first.fetch(:system_prompt), "Trustpilot"
-  end
+assert_includes client.calls.first.fetch(:system_prompt), "Trustpilot"
+end
 
-  test "refuses required blocked demo questions without calling guard client" do
-    blocked_questions = {
+test "routes product identity questions through prompt-driven guard client" do
+  client = GuardClient.new(
+    allowed: true,
+    blocked_category: "allowed",
+    reason: "The question asks which product these reviews describe.",
+    safe_rewritten_question: "What product do these reviews describe?"
+  )
+  result = ReviewAnalysis::ScopeGuard.call(
+    product: products(:ready),
+    question: "What product are we talking about?",
+    client:
+  )
+
+  assert_predicate result, :allowed?
+  assert_equal "allowed", result.blocked_category
+  assert_equal "What product do these reviews describe?", result.safe_rewritten_question
+  assert_equal 1, client.calls.size
+end
+
+test "allows broad review relevance questions without prompt over-refusal" do
+  client = GuardClient.new(allowed: false)
+
+  result = ReviewAnalysis::ScopeGuard.call(
+    product: products(:manual),
+    question: "What's most relevant in the review?",
+    client:
+  )
+
+  assert_predicate result, :allowed?
+  assert_equal "allowed", result.blocked_category
+  assert_equal "What's most relevant in the review?", result.safe_rewritten_question
+  assert_empty client.calls
+end
+
+test "refuses mixed product identity and out of scope questions without calling guard client" do
+  blocked_questions = {
+    "What product are we talking about and what are the current weather conditions?" => "outside_knowledge",
+    "What product is this and what are the latest sales numbers?" => "outside_knowledge",
+    "What product are we talking about and is it better than Zapier?" => "competitor_comparison"
+  }
+
+  blocked_questions.each do |question, category|
+    client = GuardClient.new(allowed: true)
+    result = ReviewAnalysis::ScopeGuard.call(product: products(:ready), question:, client:)
+
+    assert_not_predicate result, :allowed?, question
+    assert_equal category, result.blocked_category, question
+    assert_empty client.calls, question
+  end
+end
+
+test "refuses required blocked demo questions without calling guard client" do
+blocked_questions = {
       "How do G2 reviews compare?" => "other_review_platform",
       "What is the current weather?" => "outside_knowledge",
       "Is this better than Zapier?" => "competitor_comparison",

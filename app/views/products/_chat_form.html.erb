@@ -1,0 +1,26 @@
+<% disabled = local_assigns.fetch(:disabled, false) %>
+
+<div id="product_chat_form" style="display:flex;gap:8px;align-items:flex-end;">
+  <%= form_with url: product_chat_messages_path(product), method: :post, html: { style: "flex:1;margin:0;", data: { action: "turbo:submit-start->chat#disableWhileThinking" } } do |form| %>
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <%= form.text_field :question,
+        placeholder: "Ask anything about reviews...",
+        data: { "chat-target": "input", action: "keydown->chat#onKeydown" },
+        disabled: disabled,
+        style: "flex:1;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
+      <button type="submit"
+        <%= "disabled" if disabled %>
+        style="padding:10px 18px;background:<%= disabled ? "#b9c4be" : "#1f8a5b" %>;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:<%= disabled ? "not-allowed" : "pointer" %>;white-space:nowrap;"
+        onmouseover="this.style.background='#1a754d'"
+        onmouseout="this.style.background='#1f8a5b'">
+        Ask
+      </button>
+    </div>
+  <% end %>
+<%= button_to "CLEAR",
+    clear_product_chat_messages_path(product),
+    method: :delete,
+    disabled: disabled,
+    form: { style: "margin:0;" },
+    style: "padding:10px 14px;background:#fff;color:#{disabled ? "#b99696" : "#8a1f1f"};border:1.5px solid #e8c7c7;border-radius:9px;font-size:12px;font-weight:700;cursor:#{disabled ? "not-allowed" : "pointer"};white-space:nowrap;letter-spacing:0;" %>
+</div>

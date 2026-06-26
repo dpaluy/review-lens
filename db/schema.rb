@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_26_040000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_26_211000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
 
@@ -88,11 +88,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_26_040000) do
 
   create_table "conversations", force: :cascade do |t|
     t.bigint "ai_model_id"
+    t.datetime "cleared_at"
     t.datetime "created_at", null: false
     t.bigint "product_id"
     t.datetime "updated_at", null: false
     t.index ["ai_model_id"], name: "index_conversations_on_ai_model_id"
     t.index ["product_id"], name: "index_conversations_on_product_id"
+    t.index ["product_id"], name: "index_conversations_on_unique_product_id", unique: true, where: "(product_id IS NOT NULL)"
   end
 
   create_table "ingestion_runs", force: :cascade do |t|

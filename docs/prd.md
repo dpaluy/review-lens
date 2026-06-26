@@ -267,7 +267,7 @@ Show:
 
 No blank spinner. Blank spinner screams fragile prototype.
 
-## Page 3 — Corpus summary
+## Page 3 — Review summary
 
 Show cards:
 
@@ -307,12 +307,12 @@ What feature requests show up repeatedly?
 Give me 5 representative negative quotes.
 ```
 
-Every AI answer displays:
+Every AI answer displays only:
 
-* answer
-* confidence
+* answer text
 * supporting review IDs
-* limitations
+
+Confidence, limitations, answer status, and blocked-category fields are internal structured metadata. Do not render them in the normal chat UI. Product Q&A lives at the bottom of `/products/:id`, not on `/conversations/:id`, with one persisted conversation per product.
 
 ## Page 5 — Guardrail demo section
 
@@ -449,15 +449,28 @@ insight_batches
 - updated_at
 ```
 
+## `conversations`
+
+Each product has one persisted Q&A conversation for the product page, enforced by a unique non-null `conversations.product_id` index. Product chat creation must create or reuse that conversation and keep the analyst on `/products/:id`. `/conversations/:id` is not the user-facing product Q&A workflow.
+
+```ruby
+conversations
+- id
+- product_id
+- ai_model_id
+- created_at
+- updated_at
+```
+
 ## `chat_messages`
 
 ```ruby
 chat_messages
 - id
-- product_id
+- conversation_id
 - role:string                  # user, assistant
-- body:text
-- metadata:jsonb               # answer_status, confidence, supporting_review_ids, limitations, blocked_category
+- content:text
+- content_raw:json/jsonb       # internal answer_status, confidence, supporting_review_ids, limitations, blocked_category
 - created_at
 - updated_at
 ```
@@ -491,6 +504,10 @@ batch_summarizer.rb
 context_builder.rb
 question_answerer.rb
 ```
+
+Product-page Q&A architecture: `ProductsController#show` loads the product's single persisted `Conversation` and renders its `ChatMessage` history. `POST /products/:product_id/chat_messages` reuses that conversation, enqueues `ProductConversationResponseJob`, and responds with Turbo Streams so the browser remains on `/products/:id`. Product chat subscribes to a product-specific Turbo stream via `ProductChatBroadcaster`; generic `/internal/conversations` screens keep the generated RubyLLM `ConversationResponseJob` and `conversation_*` stream. Conversation routes may exist for generated/admin-style screens, but they are not part of the product Q&A workflow.
+
+The one-conversation-per-product rule is both application-level and database-level: `Product#conversation!` reuses the existing row, legacy conversation creation routes reuse it for product prompts, and the database rejects a second non-null `product_id` conversation.
 
 ## Adapter contract
 
@@ -831,6 +848,8 @@ Output schema:
 ```
 
 Use RubyLLM structured output so the app can reliably parse AI responses. RubyLLM documents JSON mode for valid JSON and `with_schema` for schema-compliant structured output; use `RubyLLM::Schema`/`chat.with_schema` for `BATCH_SUMMARY` and `ANSWER`. ([RubyLLM][5])
+
+`answer_markdown` is the only answer body shown to the user. `confidence`, `limitations`, `answer_status`, and `blocked_category` are internal metadata. The UI may show `supporting_review_ids` because evidence IDs are part of the assignment requirements.
 
 ---
 

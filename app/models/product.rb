@@ -78,12 +78,26 @@ class Product < ApplicationRecord
     name.presence || external_id
   end
 
+  def conversation
+    conversations.order(:id).first || conversations.build
+  end
+
+  def conversation!
+    @conversation = with_lock do
+      conversations.order(:id).first || conversations.create!
+    end
+  end
+
   def thin_corpus?
     ready? && usable_review_count < MINIMUM_USABLE_REVIEW_COUNT
   end
 
   def usable_review_count
     reviews_count.to_i
+  end
+
+  def reviews_queryable?
+    ready? && usable_review_count.positive? && reviews.exists? && insight_batches.exists?
   end
 
   private
