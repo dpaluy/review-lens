@@ -65,9 +65,10 @@ check_dependencies() {
   command -v ansible-playbook &>/dev/null || missing+=("ansible")
   command -v kamal            &>/dev/null || missing+=("kamal")
   command -v openssl          &>/dev/null || missing+=("openssl")
-  [[ ${#missing[@]} -gt 0 ]] && {
+  if [[ ${#missing[@]} -gt 0 ]]; then
     log_error "Missing dependencies:"; printf '  - %s\n' "${missing[@]}"; exit 1
-  }
+  fi
+  return 0
 }
 
 require_var() {
@@ -89,17 +90,27 @@ load_infra_secrets() {
   TF_VAR_DO_TOKEN=$(op_read_or_empty "$DO_REF")
   [[ -n "$TF_VAR_DO_TOKEN" ]] || { log_error "DO token missing at $DO_REF"; exit 1; }
 
-  export TF_VAR_ssh_public_key
-  TF_VAR_ssh_public_key="${SSH_PUBLIC_KEY:-$(cat "${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}")}"
+  # SSH key already exists in DO (data source lookup by name in server.tf).
+  export TF_VAR_ssh_key_name="${SSH_KEY_NAME:-m5}"
 
-  : "${ADMIN_IP:?ADMIN_IP is not set (CIDR, e.g. 203.0.113.5/32; never 0.0.0.0/0)}"
-  export TF_VAR_admin_ip="$ADMIN_IP"
-  export TF_VAR_do_token="$TF_VAR_DO_TOKEN"
+  # SSH firewall allowlist. Defaults open; restrict in production.
+  export TF_VAR_admin_ip="${ADMIN_IP:-0.0.0.0/0}"
   export DIGITALOCEAN_API_TOKEN="$TF_VAR_DO_TOKEN"
+  export TF_VAR_do_token="$TF_VAR_DO_TOKEN"
   export TF_VAR_spaces_region="${SPACES_REGION:-nyc3}"
+  export TF_VAR_spaces_bucket="${SPACES_BUCKET:-reviewlens-spaces}"
   export TF_VAR_project_name="reviewlens"
   export TF_VAR_droplet_region="${DROPLET_REGION:-nyc3}"
   export TF_VAR_droplet_size="${DROPLET_SIZE:-s-2vcpu-4gb}"
+
+  # Spaces key created in the DO Console, stored in 1Password. Required by the
+  # digitalocean_spaces_bucket resource.
+  export TF_VAR_spaces_access_id
+  TF_VAR_spaces_access_id=$(op_read_or_empty "$SPACES_AK_REF")
+  export TF_VAR_spaces_secret_key
+  TF_VAR_spaces_secret_key=$(op_read_or_empty "$SPACES_SK_REF")
+  [[ -n "${TF_VAR_spaces_access_id}" && -n "${TF_VAR_spaces_secret_key}" ]] \
+    || { log_error "Spaces key missing at $SPACES_AK_REF / $SPACES_SK_REF"; exit 1; }
 }
 
 load_config_secrets() {
@@ -107,14 +118,12 @@ load_config_secrets() {
   SPACES_AK=$(op_read_or_empty "$SPACES_AK_REF")
   SPACES_SK=$(op_read_or_empty "$SPACES_SK_REF")
   [[ -n "$SPACES_AK" && -n "$SPACES_SK" ]] || {
-    log_error "Spaces keys missing. After --infra, generate them in the DO console"
-    log_error "and store to 1Password:"
-    log_error "  $SPACES_AK_REF"
-    log_error "  $SPACES_SK_REF"
+    log_error "Spaces keys missing at $SPACES_AK_REF / $SPACES_SK_REF"
+    log_error "Create them in the DO Console (Spaces Keys) and store to 1Password."
     exit 1
   }
-  export TF_VAR_spaces_access_key_id="$SPACES_AK"
-  export TF_VAR_spaces_secret_access_key="$SPACES_SK"
+  export TF_VAR_spaces_access_id="$SPACES_AK"
+  export TF_VAR_spaces_secret_key="$SPACES_SK"
   ensure_postgres_password
 }
 
@@ -141,24 +150,18 @@ run_infra() {
   load_infra_secrets
   cd "$INFRA_DIR"
   [[ -f .terraform.lock.hcl ]] || tofu init
-  tofu plan -out=tfplan
+  tofu plan -input=false -out=tfplan
   read -rp "Apply changes? [y/N] " -n1 -r; echo
   if [[ $REPLY =~ ^[Yy]$ ]]; then
-    tofu apply tfplan && rm -f tfplan && echo && tofu output
+    tofu apply -input=false -auto-approve tfplan && rm -f tfplan
+    echo && echo "Server IP: $(tofu output -raw server_ip)"
   else
     log_warn "Skipped apply"; rm -f tfplan
   fi
-  cat <<EOF
-
-${YELLOW}[NEXT]${NC} Generate DO Spaces keys for the backup bucket:
-  DO console -> Settings -> Spaces Keys -> Create. Grant read/write on
-  the reviewlens-backups bucket, then store to 1Password:
-    $SPACES_AK_REF
-    $SPACES_SK_REF
-  Then run: $(basename "$0") --config
-
-EOF
 }
+
+# Spaces key created in the DO Console by the operator, stored in 1Password.
+# Loaded by load_config_secrets (shared with --config for the backup cron).
 
 server_ip() {
   (cd "$INFRA_DIR" && tofu output -raw server_ip 2>/dev/null) || true
@@ -173,10 +176,10 @@ run_config() {
 
   ansible-galaxy install -r ansible/requirements.yml
   ansible-playbook -i "$ip," --user root ansible/playbook.yml \
-    -e backup_bucket="${SPACES_BUCKET:-reviewlens-backups}" \
+    -e backup_bucket="${SPACES_BUCKET:-reviewlens-spaces}" \
     -e spaces_region="${SPACES_REGION:-nyc3}" \
-    -e spaces_access_key_id="$TF_VAR_spaces_access_key_id" \
-    -e spaces_secret_access_key="$TF_VAR_spaces_secret_access_key" \
+    -e spaces_access_key_id="$TF_VAR_spaces_access_id" \
+    -e spaces_secret_access_key="$TF_VAR_spaces_secret_key" \
     -e db_password="$POSTGRES_PASSWORD"
 }
 
@@ -192,8 +195,15 @@ run_deploy() {
     require_var DEPLOY_HOST
   fi
   require_var DEPLOY_DOMAIN
-  require_var DIGITALOCEAN_API_TOKEN
-  # .kamal/secrets resolves production.key + DO token + DB URLs from 1Password.
+  # DO token is needed by deploy.yml's ERB (registry username) AND to push the
+  # image to the DO Container Registry. Export it in THIS shell so Kamal's Ruby
+  # ERB sees it via ENV.fetch. (.kamal/secrets runs in a subshell and can't.)
+  export DIGITALOCEAN_API_TOKEN
+  DIGITALOCEAN_API_TOKEN=$(op_read_or_empty "$DO_REF")
+  [[ -n "$DIGITALOCEAN_API_TOKEN" ]] || { log_error "DO token missing at $DO_REF"; exit 1; }
+  export DIGITALOCEAN_API_TOKEN="$DIGITALOCEAN_API_TOKEN"
+  # .kamal/secrets resolves production.key + DB URLs, and sets
+  # KAMAL_REGISTRY_PASSWORD from the same token.
   kamal setup
   log_info "Done. Future deploys: kamal deploy"
 }
@@ -214,9 +224,9 @@ main() {
   [[ $do_infra == false && $do_config == false && $do_deploy == false ]] && usage && exit 0
 
   check_dependencies
-  $do_infra  && run_infra
-  $do_config && run_config
-  $do_deploy && run_deploy
+  if $do_infra;  then run_infra;  fi
+  if $do_config; then run_config; fi
+  if $do_deploy; then run_deploy; fi
   log_info "All requested steps complete."
 }
 

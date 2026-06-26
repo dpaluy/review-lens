@@ -10,7 +10,7 @@ output "server_ipv6" {
 
 output "backups_bucket" {
   description = "DO Spaces bucket for Postgres backups"
-  value       = aws_s3_bucket.backups.bucket
+  value       = digitalocean_spaces_bucket.backups.name
 }
 
 output "next_steps" {

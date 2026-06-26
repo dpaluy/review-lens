@@ -139,10 +139,20 @@
         mode: "0644"
 
     # ---- Postgres backup to DO Spaces ----
-    - name: Install awscli for Spaces uploads
+    # boto3 for Spaces (S3-compatible) uploads, in an isolated venv because
+    # Ubuntu 24.04 blocks system-wide pip installs (PEP 668).
+    - name: Install python3-venv
       apt:
-        name: awscli
+        name: python3-venv
         state: present
+
+    - name: Create venv for backup tooling
+      command: python3 -m venv /opt/reviewlens/venv
+        creates=/opt/reviewlens/venv/bin/python
+
+    - name: Install boto3 into venv
+      command: /opt/reviewlens/venv/bin/pip install --quiet boto3
+        creates=/opt/reviewlens/venv/lib/python*/site-packages/boto3
 
     - name: Create backup directory
       file:

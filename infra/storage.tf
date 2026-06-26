@@ -1,35 +1,14 @@
-# DO Spaces bucket for pg_dump backups. PostgreSQL cannot use Litestream
-# (SQLite-only), so we ship compressed pg_dump archives to Spaces instead
-# (see infra/ansible/files/pg_backup.sh, run via cron on the Droplet).
-resource "aws_s3_bucket" "backups" {
-  provider = aws.spaces
-  bucket   = "${var.project_name}-backups"
-}
+# DO Spaces bucket for pg_dump backups. The bucket is created in the DO Console
+# (DigitalOcean Spaces API cannot bootstrap: a key cannot create a bucket it
+# does not yet have access to). The Spaces key is also created in the Console
+# and stored in 1Password; this resource imports/adopt it for lifecycle tracking.
+#
+# PostgreSQL cannot use Litestream (SQLite-only), so we ship compressed
+# pg_dump archives to Spaces instead (infra/ansible/files/pg_backup.sh, run via
+# cron on the Droplet).
 
-resource "aws_s3_bucket_versioning" "backups" {
-  provider = aws.spaces
-  bucket   = aws_s3_bucket.backups.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-# Expire daily backups after 30 days; keep weekly snapshots longer via versions.
-resource "aws_s3_bucket_lifecycle_configuration" "backups" {
-  provider = aws.spaces
-  bucket   = aws_s3_bucket.backups.id
-
-  rule {
-    id     = "expire-dumps"
-    status = "Enabled"
-
-    expiration {
-      days = 30
-    }
-
-    noncurrent_version_expiration {
-      noncurrent_days = 7
-    }
-  }
+resource "digitalocean_spaces_bucket" "backups" {
+  name   = var.spaces_bucket
+  region = var.spaces_region
+  acl    = "private"
 }

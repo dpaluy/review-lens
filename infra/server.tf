@@ -1,7 +1,7 @@
-# SSH key uploaded to DigitalOcean so the Droplet can be reached.
-resource "digitalocean_ssh_key" "deploy" {
-  name       = "${var.project_name}-deploy"
-  public_key = var.ssh_public_key
+# The deploy SSH key already exists in DigitalOcean (uploaded as "m5").
+# Look it up by fingerprint instead of recreating it.
+data "digitalocean_ssh_key" "deploy" {
+  name = var.ssh_key_name
 }
 
 resource "digitalocean_droplet" "web" {
@@ -9,7 +9,7 @@ resource "digitalocean_droplet" "web" {
   image    = "ubuntu-24-04-x64"
   region   = var.droplet_region
   size     = var.droplet_size
-  ssh_keys = [digitalocean_ssh_key.deploy.id]
+  ssh_keys = [data.digitalocean_ssh_key.deploy.id]
   tags     = [var.project_name, "environment:production", "managed_by:opentofu"]
 
   # Cloud-config hardens SSH at first boot. Kamal installs Docker later via

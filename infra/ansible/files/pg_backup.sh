@@ -35,11 +35,15 @@ done
 
 tar -czf "$TMP_DIR/reviewlens-${STAMP}.tar.gz" -C "$TMP_DIR" .
 
-AWS_ACCESS_KEY_ID="$SPACES_ACCESS_KEY_ID" \
-AWS_SECRET_ACCESS_KEY="$SPACES_SECRET_ACCESS_KEY" \
-aws s3 cp "$TMP_DIR/reviewlens-${STAMP}.tar.gz" \
-  "s3://${SPACES_BUCKET}/postgres/${STAMP}.tar.gz" \
-  --endpoint-url "https://${SPACES_REGION}.digitaloceanspaces.com" \
-  --region "$SPACES_REGION"
-
-echo "[backup] uploaded reviewlens-${STAMP}.tar.gz to ${SPACES_BUCKET}/postgres/"
+# Upload via boto3 (awscli isn't packaged for Ubuntu 24.04 main).
+export AWS_ACCESS_KEY_ID="$SPACES_ACCESS_KEY_ID"
+export AWS_SECRET_ACCESS_KEY="$SPACES_SECRET_ACCESS_KEY"
+/opt/reviewlens/venv/bin/python - "$TMP_DIR/reviewlens-${STAMP}.tar.gz" <<'PY'
+import os, sys, boto3
+src, region, bucket = sys.argv[1], os.environ["SPACES_REGION"], os.environ["SPACES_BUCKET"]
+s3 = boto3.client("s3", endpoint_url=f"https://{region}.digitaloceanspaces.com", region_name=region)
+key = f"postgres/{os.path.basename(src)}"
+with open(src, "rb") as f:
+    s3.upload_fileobj(f, bucket, key)
+print(f"[backup] uploaded {key} to {bucket}")
+PY
