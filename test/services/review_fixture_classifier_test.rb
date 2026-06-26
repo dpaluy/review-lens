@@ -20,7 +20,7 @@ class ReviewFixtureClassifierTest < ActiveSupport::TestCase
   end
 
   test "classifies blocked Trustpilot fixture" do
-    result = ReviewFixtureClassifier.classify("trustpilot_blocked_captcha.html")
+    result = ReviewFixtureClassifier.classify("trustpilot_blocked.html")
 
     assert File.exist?(result.path)
     assert_equal :blocked, result.quality

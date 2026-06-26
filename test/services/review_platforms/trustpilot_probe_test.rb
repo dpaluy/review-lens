@@ -56,6 +56,19 @@ class ReviewPlatforms::TrustpilotProbeTest < ActiveSupport::TestCase
     assert_equal "manual_import", result[:recommended_adapter]
   end
 
+  test "treats blocked http statuses as block even with benign body" do
+    html = "<html><body>An unexpected page carrying no review or block signals.</body></html>"
+
+    [ 403, 429 ].each do |status|
+      result = ReviewPlatforms::TrustpilotProbe.new(html:, source_url:, fetch_metadata: { http_status: status }).call
+
+      assert_equal "blocked", result[:status], "expected blocked for http #{status}"
+      assert result[:captcha_or_block_detected], "expected block flag for http #{status}"
+      assert_equal "fail", result[:corpus_quality], "expected fail quality for http #{status}"
+      assert_equal "manual_import", result[:recommended_adapter], "expected manual import for http #{status}"
+    end
+  end
+
   test "does not count trustpilot ai summary as usable raw review" do
     html = <<~HTML
       <html>

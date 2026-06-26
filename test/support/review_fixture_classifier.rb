@@ -6,7 +6,7 @@ module ReviewFixtureClassifier
   def classify(file_name)
     path = Rails.root.join("test/fixtures/files", file_name)
     html = File.read(path)
-    blocked = html.match?(/captcha|blocked|verify you are human|unusual traffic/i)
+    blocked = html.match?(/captcha|blocked|verify you are human|unusual traffic|verifying your connection|awswaf\.com/i)
     review_count = html.scan(/data-review-card=/).count
 
     FixtureResult.new(

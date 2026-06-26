@@ -17,8 +17,11 @@ module ReviewPlatforms
       /access denied/i,
       /verify you are human/i,
       /unusual traffic/i,
-      /security check/i
+      /security check/i,
+      /verifying your connection/i,
+      /awswaf\.com/i
     ].freeze
+    BLOCKED_HTTP_STATUSES = [ 403, 429 ].freeze
 
     def initialize(html:, source_url:, fetch_metadata: {})
       @html = html.to_s
@@ -88,7 +91,11 @@ module ReviewPlatforms
     end
 
     def blocked?
-      BLOCK_PATTERNS.any? { |pattern| @html.match?(pattern) }
+      blocked_http_status? || BLOCK_PATTERNS.any? { |pattern| @html.match?(pattern) }
+    end
+
+    def blocked_http_status?
+      BLOCKED_HTTP_STATUSES.include?(@fetch_metadata[:http_status].to_i)
     end
 
     def review_bodies
