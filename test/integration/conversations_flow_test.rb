@@ -11,10 +11,12 @@ class ConversationsFlowTest < ActionDispatch::IntegrationTest
   test "conversation routes render generated screens" do
     get conversations_path
     assert_response :success
+    assert_select "a", text: "AIModels", count: 0
 
     get new_conversation_path(product_id: @product.id)
     assert_response :success
     assert_select "input[name='conversation[product_id]'][value=?]", @product.id.to_s
+    assert_select "select[name='conversation[model]']", count: 0
   end
 
   test "creates product-associated conversation and enqueues response" do

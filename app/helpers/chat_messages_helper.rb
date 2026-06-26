@@ -1,6 +1,6 @@
 module ChatMessagesHelper
   def default_model_display_name
-    "Default: #{RubyLLM.models.find(RubyLLM.config.default_model).label}"
+    "Default: #{RubyLLM.config.default_model}"
   end
 
   def tool_result_partial(message)
@@ -13,13 +13,13 @@ module ChatMessagesHelper
   end
 
   private
+    def partial_for(prefix:, name:)
+      normalized = name.to_s.underscore.tr("-", "_")
 
-  def partial_for(prefix:, name:)
-    normalized = name.to_s.underscore.tr("-", "_")
-    if normalized.present? && lookup_context.exists?(normalized, [ prefix ], true)
-      "#{prefix}/#{normalized}"
-    else
-      "#{prefix}/default"
+      if normalized.present? && lookup_context.exists?(normalized, [ prefix ], true)
+        "#{prefix}/#{normalized}"
+      else
+        "#{prefix}/default"
+      end
     end
-  end
 end

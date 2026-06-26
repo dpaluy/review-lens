@@ -8,17 +8,12 @@ class ConversationsController < ApplicationController
 
   def new
     @conversation = Conversation.new(product: @product)
-    @selected_model = params[:model]
-    @chat_models = available_chat_models
   end
 
   def create
     prompt = params.dig(:conversation, :prompt)
     if prompt.present?
-      @conversation = Conversation.create!(
-        model: params.dig(:conversation, :model).presence,
-        product: @product
-      )
+      @conversation = Conversation.create!(product: @product)
       ConversationResponseJob.perform_later(@conversation.id, prompt)
 
       redirect_to @conversation, notice: "Conversation was successfully created."
