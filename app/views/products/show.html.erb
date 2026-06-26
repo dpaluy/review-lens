@@ -1,10 +1,17 @@
 <main>
   <h1><%= @product.name.presence || @product.external_id %></h1>
 
+  <% failure_message = @product.ingestion_error.presence || @ingestion_run.error.presence %>
+  <% if @product.failed? || @ingestion_run.failed? %>
+    <section data-testid="failure-state" role="alert">
+      <h2>Failure</h2>
+      <p><%= failure_message.presence || "Ingestion failed without a recorded error." %></p>
+    </section>
+  <% end %>
+
   <% if @product.thin_corpus? %>
     <section data-testid="thin-corpus-warning" role="alert">
       <h2>Thin corpus</h2>
-
       <p>
         Only <%= pluralize(@product.usable_review_count, "usable review") %> available.
         ReviewLens needs least <%= Product::MINIMUM_USABLE_REVIEW_COUNT %> usable reviews for grounded answers.
@@ -15,7 +22,6 @@
   <% if @ingestion_run.warning_messages.any? %>
     <section data-testid="parser-warnings" role="alert">
       <h2>Parser warnings</h2>
-
       <ul>
         <% @ingestion_run.warning_messages.each do |warning_message| %>
           <li><%= warning_message %></li>
@@ -41,27 +47,18 @@
     <dd><%= @product.usable_review_count %></dd>
 
     <dt>Pages attempted</dt>
-    <dd><%= @ingestion_run.pages_attempted %></dd>
+    <dd><%= @ingestion_run.pages_attempted.presence || "Not recorded" %></dd>
 
     <dt>Pages succeeded</dt>
-    <dd><%= @ingestion_run.pages_succeeded %></dd>
+    <dd><%= @ingestion_run.pages_succeeded.presence || "Not recorded" %></dd>
 
     <dt>Reviews found</dt>
-    <dd><%= @ingestion_run.reviews_found %></dd>
+    <dd><%= @ingestion_run.reviews_found.presence || "Not recorded" %></dd>
 
     <dt>Reviews imported</dt>
-    <dd><%= @ingestion_run.reviews_imported %></dd>
+    <dd><%= @ingestion_run.reviews_imported.presence || "Not recorded" %></dd>
 
     <dt>Reviews skipped</dt>
-    <dd><%= @ingestion_run.reviews_skipped %></dd>
+    <dd><%= @ingestion_run.reviews_skipped.presence || "Not recorded" %></dd>
   </dl>
-
-  <% failure_message = @ingestion_run.error.presence || @product.ingestion_error.presence %>
-  <% if failure_message.present? %>
-    <section>
-      <h2>Failure</h2>
-
-      <p><%= failure_message %></p>
-    </section>
-  <% end %>
 </main>

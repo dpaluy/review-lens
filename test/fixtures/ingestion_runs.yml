@@ -33,6 +33,17 @@ ready:
     - One duplicate review was skipped
   raw_fetch_metadata: {}
 
+thin_corpus:
+  product: thin_corpus
+  status: ready
+  pages_attempted: 2
+  pages_succeeded: 2
+  reviews_found: 4
+  reviews_imported: 4
+  reviews_skipped: 0
+  warnings: []
+  raw_fetch_metadata: {}
+
 failed:
   product: failed
   status: failed
@@ -45,3 +56,7 @@ failed:
     - Trustpilot returned a blocking page before parsing
   error: Fetch blocked by remote host
   raw_fetch_metadata: {}
+
+missing_status_details:
+  product: missing_status_details
+  status: pending
