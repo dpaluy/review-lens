@@ -15,7 +15,7 @@ service: review_lens
 # Kamal composes the full path as <registry.server>/<image>, so do NOT prefix
 # this with the registry host. Replace "reviewlens" with your DO registry
 # subscription name if different.
-image: reviewlens
+image: reviewlens/review_lens
 
 # Two processes per the PRD: a web server (Puma behind Thruster/kamal-proxy)
 # and a dedicated Solid Queue worker. They share env, secrets, and storage.
@@ -55,10 +55,7 @@ env:
     OPENAI_MODEL: <%= ENV.fetch("OPENAI_MODEL", "gpt-4o-mini") %>
   secret:
     - RAILS_MASTER_KEY
-    - DATABASE_URL
-    - CACHE_DATABASE_URL
-    - QUEUE_DATABASE_URL
-    - CABLE_DATABASE_URL
+    - REVIEW_LENS_DATABASE_PASSWORD
 
 # PostgreSQL as an on-droplet accessory. The init.sql file creates the three
 # extra databases Rails needs for Solid Cache/Queue/Cable. For a managed
