@@ -1,0 +1,34 @@
+ready_themes:
+  product: ready
+  batch_index: 0
+  reviews_count: 3
+  review_ids:
+    - <%= ActiveRecord::FixtureSet.identify(:ready_billing) %>
+    - <%= ActiveRecord::FixtureSet.identify(:ready_exports) %>
+    - <%= ActiveRecord::FixtureSet.identify(:ready_onboarding) %>
+  summary:
+    pain_points:
+      - theme: Billing support
+        summary: Reviewers mention slow billing support and surprise renewal charges.
+        supporting_review_ids:
+          - <%= ActiveRecord::FixtureSet.identify(:ready_billing) %>
+    praised_features:
+      - theme: Exports
+        summary: Reviewers praise exports for saving operations time.
+        supporting_review_ids:
+          - <%= ActiveRecord::FixtureSet.identify(:ready_exports) %>
+    feature_requests:
+      - theme: Setup examples
+        summary: Reviewers want clearer onboarding examples.
+        supporting_review_ids:
+          - <%= ActiveRecord::FixtureSet.identify(:ready_onboarding) %>
+    buyer_objections: []
+    sentiment_patterns: []
+    representative_quotes:
+      - review_id: <%= ActiveRecord::FixtureSet.identify(:ready_billing) %>
+        quote: Billing support took three weeks to explain a surprise renewal charge.
+        theme: Billing support
+    supporting_review_ids:
+      - <%= ActiveRecord::FixtureSet.identify(:ready_billing) %>
+      - <%= ActiveRecord::FixtureSet.identify(:ready_exports) %>
+      - <%= ActiveRecord::FixtureSet.identify(:ready_onboarding) %>
