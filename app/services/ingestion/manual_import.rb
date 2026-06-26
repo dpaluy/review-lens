@@ -1,0 +1,49 @@
+module Ingestion
+  class ManualImport
+    NO_USABLE_REVIEWS_ERROR = "No usable manual review blocks were provided."
+
+    def initialize(product:, ingestion_run:, pasted_reviews:)
+      @product = product
+      @ingestion_run = ingestion_run
+      @pasted_reviews = pasted_reviews
+    end
+
+    def call
+      @product.update!(ingestion_status: "parsing", ingestion_error: nil)
+      @ingestion_run.update!(status: "parsing", started_at: Time.current, parser_version: "manual-v1")
+
+      reviews = ReviewPlatforms::ManualAdapter.new(source_url: @product.source_url).parse_reviews(@pasted_reviews)
+      import_result = Ingestion::Importer.import(@product, reviews)
+
+      @ingestion_run.update!(
+        reviews_found: reviews.size,
+        reviews_imported: import_result.imported,
+        reviews_skipped: import_result.skipped
+      )
+
+      if import_result.imported.zero?
+        mark_failed(NO_USABLE_REVIEWS_ERROR)
+      else
+        mark_ready
+      end
+    rescue StandardError => error
+      mark_failed(error.message)
+    end
+
+    private
+      def mark_ready
+        @product.update!(ingestion_status: "summarizing")
+        @ingestion_run.update!(status: "summarizing")
+
+        Ingestion::SummaryBuilder.new(product: @product).call
+
+        @product.update!(ingestion_status: "ready", ingestion_error: nil)
+        @ingestion_run.update!(status: "ready", finished_at: Time.current)
+      end
+
+      def mark_failed(error_message)
+        @product.update!(ingestion_status: "failed", ingestion_error: error_message)
+        @ingestion_run.update!(status: "failed", error: error_message, finished_at: Time.current)
+      end
+  end
+end

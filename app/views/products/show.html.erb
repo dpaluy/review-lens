@@ -37,5 +37,19 @@
 
     <dt>Usable reviews</dt>
     <dd><%= @product.usable_review_count %></dd>
+
+    <dt>Reviews found</dt>
+    <dd><%= @ingestion_run.reviews_found %></dd>
+
+    <dt>Reviews imported</dt>
+    <dd><%= @ingestion_run.reviews_imported %></dd>
+
+    <dt>Reviews skipped</dt>
+    <dd><%= @ingestion_run.reviews_skipped %></dd>
+
+    <% if @product.ingestion_error.present? %>
+      <dt>Error</dt>
+      <dd><%= @product.ingestion_error %></dd>
+    <% end %>
   </dl>
 </main>

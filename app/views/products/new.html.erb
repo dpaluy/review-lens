@@ -13,9 +13,31 @@
       </div>
     <% end %>
 
+    <fieldset>
+      <legend>Import mode</legend>
+      <div>
+        <%= form.radio_button :import_mode, "url", checked: @product.import_mode != Product::MANUAL_PLATFORM %>
+        <%= form.label :import_mode_url, "URL scrape" %>
+      </div>
+      <div>
+        <%= form.radio_button :import_mode, Product::MANUAL_PLATFORM, checked: @product.import_mode == Product::MANUAL_PLATFORM %>
+        <%= form.label :import_mode_manual, "Manual paste" %>
+      </div>
+    </fieldset>
+
+    <div>
+      <%= form.label :name, "Product name" %>
+      <%= form.text_field :name, placeholder: "QuickBooks" %>
+    </div>
+
     <div>
       <%= form.label :source_url, "Review platform URL" %>
       <%= form.url_field :source_url, placeholder: "https://www.trustpilot.com/review/quickbooks.intuit.com" %>
+    </div>
+
+    <div>
+      <%= form.label :manual_reviews, "Pasted review blocks" %>
+      <%= form.text_area :manual_reviews, rows: 12, placeholder: "Paste one review per block. Separate reviews with a blank line." %>
     </div>
 
     <%= form.submit "Ingest Reviews" %>

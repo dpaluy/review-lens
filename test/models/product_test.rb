@@ -21,7 +21,7 @@ class ProductTest < ActiveSupport::TestCase
     product = Product.new(source_url: "https://www.getapp.com/customer-management-software/a/hubspot-crm/")
 
     assert_not product.valid?
-    assert_includes product.errors[:source_url], "must be a Trustpilot URL"
+    assert_includes product.errors[:source_url], "must be Trustpilot URL"
     assert_empty product.errors[:platform]
     assert_empty product.errors[:external_id]
   end
@@ -30,7 +30,7 @@ class ProductTest < ActiveSupport::TestCase
     product = Product.new(source_url: "not url")
 
     assert_not product.valid?
-    assert_includes product.errors[:source_url], "must be a valid URL"
+    assert_includes product.errors[:source_url], "must be valid URL"
     assert_empty product.errors[:platform]
     assert_empty product.errors[:external_id]
   end
@@ -56,7 +56,7 @@ class ProductTest < ActiveSupport::TestCase
     product = Product.new(source_url: "https://www.trustpilot.com/review/")
 
     assert_not product.valid?
-    assert_includes product.errors[:source_url], "must include a Trustpilot review target"
+    assert_includes product.errors[:source_url], "must include Trustpilot review target"
   end
 
   test "enforces one cached product per platform external id pair" do
