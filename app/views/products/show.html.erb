@@ -77,12 +77,12 @@
       <% else %>
         <span style="font-size:11px;font-weight:600;background:#fbf3e2;color:#c08a1e;border:1px solid #efdcae;border-radius:20px;padding:2px 8px;"><%= pipeline&.capitalize %></span>
       <% end %>
-      <svg data-collapsible-chevron-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
+      <svg data-collapsible-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
         <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
-    <div data-collapsible-content-target="content" style="border-top:1px solid #f0f0ee;padding:20px;">
+    <div data-collapsible-target="content" style="border-top:1px solid #f0f0ee;padding:20px;">
 
       <%# Stepper %>
       <div style="position:relative;margin-bottom:24px;">
@@ -188,12 +188,12 @@
       <% if is_thin %>
         <span style="font-size:11px;font-weight:600;background:#fbf3e2;color:#c08a1e;border:1px solid #efdcae;border-radius:20px;padding:2px 8px;">Thin corpus</span>
       <% end %>
-      <svg data-collapsible-chevron-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
+      <svg data-collapsible-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
         <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
-    <div data-collapsible-content-target="content" style="border-top:1px solid #f0f0ee;padding:20px;">
+    <div data-collapsible-target="content" style="border-top:1px solid #f0f0ee;padding:20px;">
 
       <% if sec_full %>
 
@@ -318,12 +318,12 @@
       <% if sec_full %>
         <span style="font-size:11px;color:#8a9099;">Top <%= [@sample_reviews&.size || 0, 10].min %></span>
       <% end %>
-      <svg data-collapsible-chevron-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
+      <svg data-collapsible-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
         <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
-    <div data-collapsible-content-target="content" style="border-top:1px solid #f0f0ee;">
+    <div data-collapsible-target="content" style="border-top:1px solid #f0f0ee;">
 
       <% if sec_full %>
         <div style="overflow-x:auto;">
