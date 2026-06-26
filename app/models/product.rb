@@ -1,6 +1,7 @@
 class Product < ApplicationRecord
   SUPPORTED_PLATFORM = "trustpilot"
   SUPPORTED_HOSTS = %w[ trustpilot.com www.trustpilot.com ].freeze
+  MINIMUM_USABLE_REVIEW_COUNT = 20
 
   has_many :ingestion_runs, dependent: :destroy
   has_many :reviews, dependent: :destroy
@@ -20,6 +21,14 @@ class Product < ApplicationRecord
   validates :platform, :external_id, presence: true, if: :supported_source_uri?
   validates :external_id, uniqueness: { scope: :platform }, allow_nil: true
   validate :source_url_is_supported
+
+  def thin_corpus?
+    ready? && usable_review_count < MINIMUM_USABLE_REVIEW_COUNT
+  end
+
+  def usable_review_count
+    reviews_count.to_i
+  end
 
   def self.find_or_initialize_from_source_url(source_url)
     identity = source_identity(source_url)

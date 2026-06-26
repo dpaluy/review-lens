@@ -1,6 +1,27 @@
 <main>
   <h1><%= @product.name.presence || @product.external_id %></h1>
 
+  <% if @product.thin_corpus? %>
+    <section data-testid="thin-corpus-warning" role="alert">
+      <h2>Thin corpus</h2>
+      <p>
+        Only <%= pluralize(@product.usable_review_count, "usable review") %> are available.
+        ReviewLens needs at least <%= Product::MINIMUM_USABLE_REVIEW_COUNT %> usable reviews for grounded answers.
+      </p>
+    </section>
+  <% end %>
+
+  <% if @ingestion_run.warning_messages.any? %>
+    <section data-testid="parser-warnings" role="alert">
+      <h2>Parser warnings</h2>
+      <ul>
+        <% @ingestion_run.warning_messages.each do |warning_message| %>
+          <li><%= warning_message %></li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
   <dl>
     <dt>Platform</dt>
     <dd><%= @product.platform %></dd>
@@ -13,5 +34,8 @@
 
     <dt>Ingestion run</dt>
     <dd><%= @ingestion_run.status %></dd>
+
+    <dt>Usable reviews</dt>
+    <dd><%= @product.usable_review_count %></dd>
   </dl>
 </main>
