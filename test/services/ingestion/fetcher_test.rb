@@ -23,6 +23,36 @@ class Ingestion::FetcherTest < ActiveSupport::TestCase
     assert_equal "text/html", result.metadata[:content_type]
   end
 
+  test "fails blocked http responses before parsing" do
+    fetcher = Ingestion::Fetcher.new(transport: lambda { |_uri, _limits|
+      Response.new(status: 403, headers: { "content-type" => "text/html" }, body: "<html>blocked</html>")
+    })
+
+    result = fetcher.fetch("https://www.trustpilot.com/review/quickbooks.intuit.com")
+
+    assert_not result.success?
+    assert_equal "blocked", result.error_code
+    assert_nil result.body
+    assert_equal 403, result.metadata[:http_status]
+    assert_equal 1, result.metadata[:pages_attempted]
+    assert_equal 0, result.metadata[:pages_succeeded]
+  end
+
+  test "fails server error http responses before parsing" do
+    fetcher = Ingestion::Fetcher.new(transport: lambda { |_uri, _limits|
+      Response.new(status: 500, headers: {}, body: "<html>server error</html>")
+    })
+
+    result = fetcher.fetch("https://www.trustpilot.com/review/quickbooks.intuit.com")
+
+    assert_not result.success?
+    assert_equal "http_500", result.error_code
+    assert_nil result.body
+    assert_equal 500, result.metadata[:http_status]
+    assert_equal 1, result.metadata[:pages_attempted]
+    assert_equal 0, result.metadata[:pages_succeeded]
+  end
+
   test "rejects non trustpilot hosts before requesting" do
     requested = false
     fetcher = Ingestion::Fetcher.new(transport: lambda { |_uri, _limits|

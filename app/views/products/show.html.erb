@@ -12,8 +12,12 @@
   show_warnings = has_warning_messages || (sec_full && skipped > 0)
 
   steps = %w[pending fetching parsing summarizing ready]
+  failure_error = @ingestion_run.error.presence || @product.ingestion_error
+  fetch_failed = failure_error.to_s.start_with?("Trustpilot fetch") || failure_error == "Fetch blocked by remote host"
   failed_pipeline =
-    if @product.reviews_count.to_i.positive? || @ingestion_run.reviews_imported.to_i.positive?
+    if fetch_failed
+      "fetching"
+    elsif @product.reviews_count.to_i.positive? || @ingestion_run.reviews_imported.to_i.positive?
       "summarizing"
     elsif @ingestion_run.pages_succeeded.to_i.positive?
       "parsing"

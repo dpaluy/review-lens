@@ -2,6 +2,7 @@ class IngestReviewsJob < ApplicationJob
   queue_as :default
 
   FETCH_FAILURE_MESSAGE = "Trustpilot fetch failed: %s"
+  FETCH_BLOCKED_MESSAGE = "Trustpilot fetch blocked by remote host"
   NO_USABLE_REVIEWS_MESSAGE = "No usable Trustpilot review cards found. Use manual import or another public Trustpilot URL."
   SUMMARIZATION_FAILURE_MESSAGE = "Review summarization failed: %s"
   BLOCKED_WARNING = "Trustpilot returned blocking page before parsing"
@@ -19,13 +20,15 @@ class IngestReviewsJob < ApplicationJob
     fetch_result = Ingestion::Fetcher.new.fetch(product.source_url)
     update_fetch_counters(fetch_result.metadata)
 
-    return mark_failed(FETCH_FAILURE_MESSAGE % fetch_result.error_code) unless fetch_result.success?
+    return mark_failed(fetch_failure_message(fetch_result.error_code)) unless fetch_result.success?
 
     probe_result = probe(fetch_result)
     ingestion_run.update!(
       raw_fetch_metadata: { fetch: fetch_result.metadata, probe: probe_result },
       warnings: probe_warnings(probe_result)
     )
+
+    return mark_failed(FETCH_BLOCKED_MESSAGE) if probe_result[:captcha_or_block_detected]
 
     mark_parsing
 
@@ -109,6 +112,12 @@ class IngestReviewsJob < ApplicationJob
         (BLOCKED_WARNING if probe_result[:captcha_or_block_detected]),
         (THIN_CORPUS_WARNING if probe_result[:corpus_quality] == "thin")
       ].compact
+    end
+
+    def fetch_failure_message(error_code)
+      return FETCH_BLOCKED_MESSAGE if error_code == "blocked"
+
+      FETCH_FAILURE_MESSAGE % error_code
     end
 
     def update_product_metadata(html)

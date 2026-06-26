@@ -83,6 +83,23 @@ class IngestReviewsJobTest < ActiveJob::TestCase
     assert_empty product.reviews
   end
 
+  test "fails blocked fetches with user-facing fetch error" do
+    product = products(:missing_status_details)
+    ingestion_run = ingestion_runs(:missing_status_details)
+
+    run_with_fetch_result(ingestion_run, failed_fetch_result("blocked")) do
+      IngestReviewsJob.perform_now(ingestion_run)
+    end
+
+    assert_predicate product.reload, :failed?
+    assert_predicate ingestion_run.reload, :failed?
+    assert_equal IngestReviewsJob::FETCH_BLOCKED_MESSAGE, product.ingestion_error
+    assert_equal IngestReviewsJob::FETCH_BLOCKED_MESSAGE, ingestion_run.error
+    assert_equal 1, ingestion_run.pages_attempted
+    assert_equal 0, ingestion_run.pages_succeeded
+    assert_empty product.reviews
+  end
+
   test "records thin corpus parser warning" do
     html = file_fixture("trustpilot_thin_corpus.html").read
     product = products(:missing_status_details)
@@ -101,7 +118,7 @@ class IngestReviewsJobTest < ActiveJob::TestCase
     assert_equal 1, product.insight_batches.count
   end
 
-  test "records blocked parser warning and fails without reviews" do
+  test "records blocked probe warning and fails before parsing" do
     html = file_fixture("trustpilot_blocked_captcha.html").read
     product = products(:missing_status_details)
     ingestion_run = ingestion_runs(:missing_status_details)
@@ -114,7 +131,8 @@ class IngestReviewsJobTest < ActiveJob::TestCase
     assert_predicate ingestion_run.reload, :failed?
     assert_includes ingestion_run.warning_messages, IngestReviewsJob::BLOCKED_WARNING
     assert_equal "blocked", ingestion_run.raw_fetch_metadata.fetch("probe").fetch("status")
-    assert_equal IngestReviewsJob::NO_USABLE_REVIEWS_MESSAGE, ingestion_run.error
+    assert_equal IngestReviewsJob::FETCH_BLOCKED_MESSAGE, ingestion_run.error
+    assert_equal 0, ingestion_run.reviews_found
   end
 
   private
