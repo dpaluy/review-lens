@@ -35,3 +35,39 @@ unknown:
   sentiment: unknown
   body: No rating.
   raw_payload: {}
+
+ready_billing:
+  product: ready
+  external_review_id: ready-billing
+  content_hash: ready-billing-hash
+  source_url: https://www.trustpilot.com/review/ready.example.com
+  rating: 2
+  sentiment: negative
+  title: Billing confusion
+  body: Billing support took three weeks to explain a surprise renewal charge.
+  reviewer_label: Finance lead
+  raw_payload: {}
+
+ready_exports:
+  product: ready
+  external_review_id: ready-exports
+  content_hash: ready-exports-hash
+  source_url: https://www.trustpilot.com/review/ready.example.com
+  rating: 4
+  sentiment: positive
+  title: Useful exports
+  body: The export workflow saves our operations team hours every week.
+  reviewer_label: Operations manager
+  raw_payload: {}
+
+ready_onboarding:
+  product: ready
+  external_review_id: ready-onboarding
+  content_hash: ready-onboarding-hash
+  source_url: https://www.trustpilot.com/review/ready.example.com
+  rating: 3
+  sentiment: neutral
+  title: Onboarding needs examples
+  body: Onboarding worked eventually, but the setup examples were thin.
+  reviewer_label: Founder
+  raw_payload: {}
