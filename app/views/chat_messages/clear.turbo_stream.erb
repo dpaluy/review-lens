@@ -1,0 +1,7 @@
+<%= turbo_stream.remove "product_chat_pending" %>
+<%= turbo_stream.replace "chat_messages" do %>
+  <%= render "products/chat_messages", product: @product, chat_messages: [] %>
+<% end %>
+<%= turbo_stream.replace "product_chat_form" do %>
+  <%= render "products/chat_form", product: @product %>
+<% end %>

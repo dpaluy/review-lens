@@ -14,4 +14,13 @@ class ConversationTest < ActiveSupport::TestCase
     assert_equal conversation, chat_message.conversation
     assert_kind_of ActiveRecord::Associations::CollectionProxy, conversation.chat_messages
   end
+
+  test "allows only one conversation per product" do
+    Conversation.create!(product: products(:ready))
+
+    duplicate = Conversation.new(product: products(:ready))
+
+    assert_not duplicate.valid?
+    assert_includes duplicate.errors[:product_id], "has already been taken"
+  end
 end

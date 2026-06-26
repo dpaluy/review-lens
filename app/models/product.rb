@@ -78,6 +78,16 @@ class Product < ApplicationRecord
     name.presence || external_id
   end
 
+  def conversation
+    conversations.order(:id).first || conversations.build(ai_model: product_conversation_ai_model)
+  end
+
+  def conversation!
+    @conversation = with_lock do
+      conversations.order(:id).first || conversations.create!(ai_model: product_conversation_ai_model)
+    end
+  end
+
   def thin_corpus?
     ready? && usable_review_count < MINIMUM_USABLE_REVIEW_COUNT
   end
@@ -86,7 +96,19 @@ class Product < ApplicationRecord
     reviews_count.to_i
   end
 
+  def reviews_queryable?
+    ready? && usable_review_count.positive? && reviews.exists? && insight_batches.exists?
+  end
+
   private
+
+  def product_conversation_ai_model
+    model_id = RubyLLM.config.default_model
+
+    AIModel.find_or_create_by!(provider: "openai", model_id:) do |model|
+      model.name = model_id
+    end
+  end
 
   def self.parse_source_uri(source_url)
     URI.parse(source_url)

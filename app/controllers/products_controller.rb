@@ -14,7 +14,10 @@ class ProductsController < ApplicationController
       @field_coverage = compute_field_coverage
     end
 
-    @chat_messages = (session.dig(:chat, @product.id.to_s) || [])
+    if @product.reviews_queryable?
+      @conversation = @product.conversation!
+      @chat_messages = @conversation.chat_messages.order(:created_at, :id)
+    end
   end
 
   def create

@@ -1,0 +1,11 @@
+<div id="chat_messages" style="margin-bottom:16px;display:flex;flex-direction:column;gap:12px;">
+  <% if chat_messages.empty? %>
+    <div id="product_chat_empty" style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px;padding:24px;text-align:center;">
+      <p style="font-size:14px;color:#8a9099;margin:0;">Ask question about <%= product.display_name %> reviews.</p>
+    </div>
+  <% else %>
+    <% chat_messages.each do |chat_message| %>
+      <%= render chat_message %>
+    <% end %>
+  <% end %>
+</div>

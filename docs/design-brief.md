@@ -39,7 +39,7 @@ One scrolling column (max-width ~960px) with **four stacked sections that unlock
 - Dense table: `Rating | Title | Excerpt | Source`. Rating as stars or numeric badge, excerpt truncated with ellipsis. ~10 rows, scannable. This is proof the corpus is real.
 
 **Section 4 — Ask the reviews** (unlocks at `ready`)
-- **Suggested-prompt chips** above the input: "Top pain points" · "What users praise" · "Objections that hurt sales" · "Repeated feature requests" · "5 negative quotes". Clicking fills the question.
+- Plain review Q&A input only. Do not show canned suggested-prompt chips around the input.
 - **Chat transcript**: user question (right/neutral) and assistant answer (left). Each **assistant answer is a structured card**, not a plain bubble:
   - Answer body (markdown)
   - **Confidence** badge (low/medium/high)

@@ -3,7 +3,7 @@ class ChatMessage < ApplicationRecord
 
   has_many_attached :attachments
 
-  broadcasts_to ->(chat_message) { "conversation_#{chat_message.conversation_id}" }, inserts_by: :append
+  after_create_commit :broadcast_message
 
   def answer_metadata
     content_raw.is_a?(Hash) ? content_raw : {}
@@ -15,14 +15,22 @@ class ChatMessage < ApplicationRecord
       content: ERB::Util.html_escape(content.to_s)
   end
 
-  # After RubyLLM finishes streaming, the assistant message is persisted via an
+  # After RubyLLM finishes streaming, the assistant message is persisted via
   # update, so the create-time append broadcast never fires. Re-render the whole
-  # message container so the streamed (escaped) text is replaced with proper
-  # markdown rendering. Rendered via #to_partial_path -> chat_messages/_assistant.
+  # message so streamed escaped text is replaced with proper markdown rendering.
   def broadcast_render_in_conversation
     broadcast_replace_to "conversation_#{conversation_id}",
       target: "chat_message_#{id}",
       partial: to_partial_path,
+      locals: { chat_message: self }
+  end
+
+  private
+
+  def broadcast_message
+    broadcast_append_to "conversation_#{conversation_id}",
+      target: "chat_messages",
+      partial: "chat_messages/#{role}",
       locals: { chat_message: self }
   end
 end

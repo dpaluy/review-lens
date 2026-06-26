@@ -132,6 +132,18 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     assert_select "[data-testid='thin-corpus-warning']", false
   end
 
+  test "disables product chat until reviews are queryable" do
+    product = products(:example)
+    product.update!(ingestion_status: "ready", reviews_count: product.reviews.count)
+
+    get product_path(product)
+
+    assert_response :success
+    assert_select "#product_chat_form", false
+    assert_select "#chat_messages", false
+    assert_select "p", "Q&A unlocks when reviews finish processing"
+  end
+
   test "shows in progress ingestion counters and parser warnings" do
     get product_path(products(:fetching))
 
@@ -211,7 +223,7 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     assert_select "[data-testid='thin-corpus-warning']", false
   end
 
-  test "renders thin corpus warning as first class warning" do
+  test "renders thin review set warning as first class warning" do
     product = products(:example)
     product.update_columns(ingestion_status: "ready", reviews_count: 4)
     ingestion_runs(:pending).update!(status: "ready", warnings: [])
@@ -220,7 +232,7 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "[data-testid='thin-corpus-warning']" do
-      assert_select "p", /Thin corpus/
+      assert_select "p", /Thin review set/
       assert_select "p", "Only 4 usable reviews available. ReviewLens needs least 20 usable reviews for grounded answers."
     end
     assert_select "[data-testid='parser-warnings']", false

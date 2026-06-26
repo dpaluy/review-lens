@@ -8,6 +8,41 @@ class ProductTest < ActiveSupport::TestCase
     assert_includes product.reviews, reviews(:positive)
   end
 
+  test "conversation bang creates then reuses one product conversation" do
+    product = products(:ready)
+
+    assert_difference -> { product.conversations.count }, 1 do
+      product.conversation!
+    end
+
+    first_conversation = product.conversations.order(:id).first
+
+    assert_no_difference -> { product.conversations.count } do
+      assert_equal first_conversation, product.conversation!
+    end
+  end
+
+  test "conversation bang does not require configured RubyLLM provider credentials" do
+    original_openai_api_key = RubyLLM.config.openai_api_key
+    RubyLLM.config.openai_api_key = nil
+
+    assert_predicate products(:ready).conversation!, :persisted?
+  ensure
+    RubyLLM.config.openai_api_key = original_openai_api_key
+  end
+
+  test "conversation does not return stale unsaved record after conversation bang" do
+    product = products(:ready)
+    built_conversation = product.conversation
+
+    assert_not_predicate built_conversation, :persisted?
+
+    persisted_conversation = product.conversation!
+
+    assert_predicate persisted_conversation, :persisted?
+    assert_equal persisted_conversation, product.conversation
+  end
+
   test "requires source url before deriving cache identity" do
     product = Product.new(name: "Example")
 
@@ -95,6 +130,14 @@ class ProductTest < ActiveSupport::TestCase
 
   test "uses reviews count as usable review count" do
     assert_equal 4, products(:example).usable_review_count
+  end
+
+  test "reviews are queryable only after reviews and insight batches exist" do
+    product = products(:example)
+    product.update!(ingestion_status: "ready", reviews_count: product.reviews.count)
+
+    assert_not_predicate product, :reviews_queryable?
+    assert_predicate products(:ready), :reviews_queryable?
   end
 
   test "reports thin corpus only when ready and below usable review threshold" do
