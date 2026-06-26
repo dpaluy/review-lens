@@ -1,0 +1,7 @@
+<% if defined?(@conversation) && @conversation.present? %>
+  <%= turbo_stream.replace "new_chat_message" do %>
+    <%= render "chat_messages/form",
+      conversation: @conversation,
+      chat_message: @conversation.chat_messages.build %>
+  <% end %>
+<% end %>

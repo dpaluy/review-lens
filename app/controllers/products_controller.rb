@@ -32,11 +32,15 @@ class ProductsController < ApplicationController
 
   private
     def create_url_import
+      ingestion_run = nil
+
       Product.transaction do
         @product = Product.find_or_initialize_from_source_url(product_params[:source_url])
         @product.save!
-        @product.ingestion_runs.create!
+        ingestion_run = @product.ingestion_runs.create!
       end
+
+      IngestReviewsJob.perform_later(ingestion_run)
     end
 
     def create_manual_import

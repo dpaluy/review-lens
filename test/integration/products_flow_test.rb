@@ -1,12 +1,16 @@
 require "test_helper"
 
 class ProductsFlowTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
   test "creates product ingestion run trustpilot url" do
-    assert_difference -> { Product.count }, 1 do
-      assert_difference -> { IngestionRun.count }, 1 do
-        post products_path, params: {
-          product: { source_url: "https://www.trustpilot.com/review/quickbooks.intuit.com" }
-        }
+    assert_enqueued_jobs 1, only: IngestReviewsJob do
+      assert_difference -> { Product.count }, 1 do
+        assert_difference -> { IngestionRun.count }, 1 do
+          post products_path, params: {
+            product: { source_url: "https://www.trustpilot.com/review/quickbooks.intuit.com" }
+          }
+        end
       end
     end
 

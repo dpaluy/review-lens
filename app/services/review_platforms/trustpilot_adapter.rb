@@ -37,7 +37,27 @@ module ReviewPlatforms
       end
     end
 
+    def parse_product_metadata(page_html)
+      document = Nokogiri::HTML(page_html)
+
+      { name: product_name(document) }.compact
+    end
+
     private
+      def product_name(document)
+        heading = normalize_text(document.at_css("h1")&.text)
+        title = normalize_text(document.at_css("title")&.text)
+
+        normalize_product_name(heading || title)
+      end
+
+      def normalize_product_name(text)
+        normalize_text(text)
+          &.sub(/\s+\|\s+Trustpilot\z/, "")
+          &.sub(/\s+Reviews\z/, "")
+          &.presence
+      end
+
       def review_cards(document)
         REVIEW_CARD_SELECTORS.flat_map { |selector| document.css(selector).to_a }.uniq
       end
