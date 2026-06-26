@@ -73,4 +73,50 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
 
     assert_response :not_found
   end
+
+  test "renders parser warnings on product status page" do
+    product = products(:example)
+    product.update_columns(ingestion_status: "ready", reviews_count: 25)
+    ingestion_runs(:pending).update!(
+      status: "ready",
+      warnings: [
+        { "code" => "missing_dates", "message" => "Review dates were missing on 3 reviews." }
+      ]
+    )
+
+    get product_path(product)
+
+    assert_response :success
+    assert_select "[data-testid='parser-warnings']" do
+      assert_select "h2", "Parser warnings"
+      assert_select "li", "Review dates were missing on 3 reviews."
+    end
+  end
+
+  test "does not render parser warnings when warnings are empty" do
+    product = products(:example)
+    product.update_columns(ingestion_status: "ready", reviews_count: 20)
+    ingestion_runs(:pending).update!(status: "ready", warnings: [])
+
+    get product_path(product)
+
+    assert_response :success
+    assert_select "[data-testid='parser-warnings']", false
+    assert_select "[data-testid='thin-corpus-warning']", false
+  end
+
+  test "renders thin corpus warning as first class warning" do
+    product = products(:example)
+    product.update_columns(ingestion_status: "ready", reviews_count: 4)
+    ingestion_runs(:pending).update!(status: "ready", warnings: [])
+
+    get product_path(product)
+
+    assert_response :success
+    assert_select "[data-testid='thin-corpus-warning']" do
+      assert_select "h2", "Thin corpus"
+      assert_select "p", "Only 4 usable reviews are available. ReviewLens needs at least 20 usable reviews for grounded answers."
+    end
+    assert_select "[data-testid='parser-warnings']", false
+  end
 end
