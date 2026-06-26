@@ -160,6 +160,10 @@ collection after deleting manifests. If quota errors continue and the repository
 has no visible manifests to delete, run `FORCE_GC=1 bin/prune-docr-repository`
 outside of `kamal deploy`, wait for it to finish, then retry deploy.
 
+The deploy builder disables BuildKit provenance and SBOM attestations because
+the current DigitalOcean registry tier only allows one repository. Attestation
+pushes can trip that repository limit even when image storage is available.
+
 ## Database topology
 
 A single Postgres instance hosts four databases:
