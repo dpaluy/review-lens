@@ -1,7 +1,7 @@
 require "test_helper"
 
 class ProductTest < ActiveSupport::TestCase
-  test "has ingestion runs and reviews from fixtures" do
+  test "has ingestion runs reviews fixtures" do
     product = products(:example)
 
     assert_includes product.ingestion_runs, ingestion_runs(:pending)
@@ -18,16 +18,16 @@ class ProductTest < ActiveSupport::TestCase
   end
 
   test "rejects unsupported urls without derived identity errors" do
-    product = Product.new(source_url: "https://www.trustpilot.com/review/example.com")
+    product = Product.new(source_url: "https://www.getapp.com/customer-management-software/a/hubspot-crm/")
 
     assert_not product.valid?
-    assert_includes product.errors[:source_url], "must be a GetApp URL"
+    assert_includes product.errors[:source_url], "must be a Trustpilot URL"
     assert_empty product.errors[:platform]
     assert_empty product.errors[:external_id]
   end
 
   test "rejects malformed urls without derived identity errors" do
-    product = Product.new(source_url: "not a url")
+    product = Product.new(source_url: "not url")
 
     assert_not product.valid?
     assert_includes product.errors[:source_url], "must be a valid URL"
@@ -35,21 +35,28 @@ class ProductTest < ActiveSupport::TestCase
     assert_empty product.errors[:external_id]
   end
 
-  test "derives external id from getapp product slug" do
-    product = Product.new(source_url: "https://www.getapp.com/customer-management-software/a/hubspot-crm/")
+  test "derives external id from trustpilot review target" do
+    product = Product.new(source_url: "https://www.trustpilot.com/review/quickbooks.intuit.com")
 
     assert product.valid?
-    assert_equal "getapp", product.platform
-    assert_equal "hubspot-crm", product.external_id
+    assert_equal "trustpilot", product.platform
+    assert_equal "quickbooks.intuit.com", product.external_id
   end
 
-  test "finds cached product by getapp product slug" do
-    existing_product = Product.create!(source_url: "https://www.getapp.com/customer-management-software/a/hubspot-crm/")
+  test "finds cached product by trustpilot review target" do
+    existing_product = Product.create!(source_url: "https://www.trustpilot.com/review/quickbooks.intuit.com")
 
-    cached_product = Product.find_or_initialize_from_source_url("https://www.getapp.com/sales-software/a/hubspot-crm/")
+    cached_product = Product.find_or_initialize_from_source_url("https://www.trustpilot.com/review/quickbooks.intuit.com?languages=all")
 
     assert_predicate cached_product, :persisted?
     assert_equal existing_product, cached_product
+  end
+
+  test "rejects trustpilot urls without review target" do
+    product = Product.new(source_url: "https://www.trustpilot.com/review/")
+
+    assert_not product.valid?
+    assert_includes product.errors[:source_url], "must include a Trustpilot review target"
   end
 
   test "enforces one cached product per platform external id pair" do

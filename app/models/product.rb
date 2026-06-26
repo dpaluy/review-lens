@@ -1,6 +1,6 @@
 class Product < ApplicationRecord
-  SUPPORTED_PLATFORM = "getapp"
-  SUPPORTED_HOSTS = %w[ getapp.com www.getapp.com ].freeze
+  SUPPORTED_PLATFORM = "trustpilot"
+  SUPPORTED_HOSTS = %w[ trustpilot.com www.trustpilot.com ].freeze
 
   has_many :ingestion_runs, dependent: :destroy
   has_many :reviews, dependent: :destroy
@@ -54,9 +54,7 @@ class Product < ApplicationRecord
       return unless source_uri
 
       segments = source_uri.path.split("/").reject(&:blank?)
-      slug_index = segments.index("a")
-
-      segments[slug_index + 1] if slug_index
+      segments[1] if segments.first == "review"
     end
 
     def set_source_identity
@@ -77,9 +75,9 @@ class Product < ApplicationRecord
       elsif !source_uri.is_a?(URI::HTTP)
         errors.add :source_url, "must be HTTP or HTTPS"
       elsif !SUPPORTED_HOSTS.include?(source_uri.host.downcase)
-        errors.add :source_url, "must be a GetApp URL"
+        errors.add :source_url, "must be a Trustpilot URL"
       elsif self.class.product_slug(source_uri).blank?
-        errors.add :source_url, "must include a GetApp product slug"
+        errors.add :source_url, "must include a Trustpilot review target"
       end
     end
 
