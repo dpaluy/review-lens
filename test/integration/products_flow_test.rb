@@ -48,7 +48,7 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_includes response.body, "Source url must be a Trustpilot URL"
+    assert_includes response.body, "Source url must be Trustpilot URL"
     assert_not_includes response.body, "Platform can't be blank"
     assert_not_includes response.body, "External can't be blank"
   end
@@ -63,9 +63,80 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :unprocessable_content
-    assert_includes response.body, "Source url must be a valid URL"
+    assert_includes response.body, "Source url must be valid URL"
     assert_not_includes response.body, "Platform can't be blank"
     assert_not_includes response.body, "External can't be blank"
+  end
+
+  test "creates manual import product with pasted review blocks" do
+    pasted_reviews = <<~TEXT
+      Setup was simple and support answered quickly.
+
+
+      Billing was confusing and cancellation took too long.
+
+      Setup was simple and support answered quickly.
+
+    TEXT
+
+    assert_difference -> { Product.count }, 1 do
+      assert_difference -> { IngestionRun.count }, 1 do
+        assert_difference -> { Review.count }, 2 do
+          post products_path, params: {
+            product: {
+              import_mode: "manual",
+              name: "Manual CRM",
+              source_url: "https://example.com/manual-crm-reviews",
+              manual_reviews: pasted_reviews
+            }
+          }
+        end
+      end
+    end
+
+    product = Product.order(:created_at).last
+    ingestion_run = product.ingestion_runs.last
+
+    assert_redirected_to product_path(product)
+    assert_equal "manual", product.platform
+    assert_equal "Manual CRM", product.name
+    assert_equal "https://example.com/manual-crm-reviews", product.source_url
+    assert_predicate product, :ready?
+    assert_predicate ingestion_run, :ready?
+    assert_equal 3, ingestion_run.reviews_found
+    assert_equal 2, ingestion_run.reviews_imported
+    assert_equal 1, ingestion_run.reviews_skipped
+    assert_equal 2, product.reviews_count
+    assert_equal [
+      "Billing was confusing and cancellation took too long.",
+      "Setup was simple and support answered quickly."
+    ], product.reviews.order(:body).pluck(:body)
+  end
+
+  test "manual import skips empty blocks and fails clearly without reviews" do
+    assert_difference -> { Product.count }, 1 do
+      assert_difference -> { IngestionRun.count }, 1 do
+        assert_no_difference -> { Review.count } do
+          post products_path, params: {
+            product: {
+              import_mode: "manual",
+              name: "Empty Manual Import",
+              source_url: "https://example.com/empty",
+              manual_reviews: "\n\n  \n\n"
+            }
+          }
+        end
+      end
+    end
+
+    product = Product.order(:created_at).last
+    ingestion_run = product.ingestion_runs.last
+
+    assert_redirected_to product_path(product)
+    assert_predicate product, :failed?
+    assert_predicate ingestion_run, :failed?
+    assert_equal "No usable manual review blocks were provided.", product.ingestion_error
+    assert_equal "No usable manual review blocks were provided.", ingestion_run.error
   end
 
   test "does not fake ingestion run status when run is missing" do

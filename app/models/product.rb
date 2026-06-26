@@ -1,7 +1,10 @@
 class Product < ApplicationRecord
   SUPPORTED_PLATFORM = "trustpilot"
+  MANUAL_PLATFORM = "manual"
   SUPPORTED_HOSTS = %w[ trustpilot.com www.trustpilot.com ].freeze
   MINIMUM_USABLE_REVIEW_COUNT = 20
+
+  attr_accessor :import_mode, :manual_reviews
 
   has_many :ingestion_runs, dependent: :destroy
   has_many :reviews, dependent: :destroy
@@ -16,11 +19,13 @@ class Product < ApplicationRecord
   }
 
   before_validation :set_source_identity
+  before_validation :set_manual_identity
 
   validates :source_url, presence: true
   validates :platform, :external_id, presence: true, if: :supported_source_uri?
+  validates :platform, :external_id, :name, presence: true, if: :manual_import?
   validates :external_id, uniqueness: { scope: :platform }, allow_nil: true
-  validate :source_url_is_supported
+  validate :source_url_is_supported, unless: :manual_import?
 
   def thin_corpus?
     ready? && usable_review_count < MINIMUM_USABLE_REVIEW_COUNT
@@ -52,6 +57,10 @@ class Product < ApplicationRecord
     { source_url: normalized_source_url, external_id: slug }
   end
 
+  def manual_import?
+    import_mode == MANUAL_PLATFORM || platform == MANUAL_PLATFORM
+  end
+
   private
     def self.parse_source_uri(source_url)
       URI.parse(source_url)
@@ -63,10 +72,13 @@ class Product < ApplicationRecord
       return unless source_uri
 
       segments = source_uri.path.split("/").reject(&:blank?)
+
       segments[1] if segments.first == "review"
     end
 
     def set_source_identity
+      return if manual_import?
+
       self.source_url = source_url.to_s.strip
       @source_uri = nil
 
@@ -78,15 +90,23 @@ class Product < ApplicationRecord
       self.external_id = identity[:external_id]
     end
 
+    def set_manual_identity
+      return unless manual_import?
+
+      self.platform = MANUAL_PLATFORM
+      self.source_url = source_url.to_s.strip
+      self.external_id ||= "manual-#{SecureRandom.uuid}"
+    end
+
     def source_url_is_supported
       if source_uri.blank? || source_uri.host.blank?
-        errors.add :source_url, "must be a valid URL"
+        errors.add :source_url, "must be valid URL"
       elsif !source_uri.is_a?(URI::HTTP)
         errors.add :source_url, "must be HTTP or HTTPS"
       elsif !SUPPORTED_HOSTS.include?(source_uri.host.downcase)
-        errors.add :source_url, "must be a Trustpilot URL"
+        errors.add :source_url, "must be Trustpilot URL"
       elsif self.class.product_slug(source_uri).blank?
-        errors.add :source_url, "must include a Trustpilot review target"
+        errors.add :source_url, "must include Trustpilot review target"
       end
     end
 

@@ -53,6 +53,8 @@ module Ingestion
           title: parsed_review[:title].to_s.squish.presence,
           body: body.truncate(MAX_BODY_LENGTH, omission: ""),
           reviewer_label: parsed_review[:reviewer_label].to_s.squish.presence,
+          reviewer_role: parsed_review[:reviewer_role].to_s.squish.presence,
+          reviewer_company_size: parsed_review[:reviewer_company_size].to_s.squish.presence,
           review_date: parsed_review[:review_date],
           raw_payload: parsed_review[:raw_payload].presence || {}
         }
@@ -68,7 +70,11 @@ module Ingestion
 
       def content_hash_for(parsed_review, body)
         Digest::SHA256.hexdigest(
-          [ body, parsed_review[:rating], parsed_review[:reviewer_label].to_s.squish.presence ].compact.join("\n")
+          [
+            body,
+            parsed_review[:rating],
+            parsed_review[:reviewer_label].to_s.squish.presence
+          ].compact.join("\n")
         )
       end
 

@@ -180,6 +180,8 @@ Use OpenAI Structured Outputs so the app can parse responses reliably.
 
 - Ruby styling: Omakase (`bin/rubocop`). Match existing style, don't introduce a
   house config.
+- Do not add `require` calls inside Rails app files. If a constant is unavailable,
+  fix the Rails loading boundary or use an already-loaded framework API instead.
 - No secrets in code. Use Rails credentials and `.kamal/secrets` (gitignored).
 - Keep it boring: simple services, plain ERB, no premature abstraction. The PRD
   explicitly warns against scope creep toward a "generic data ingestion platform."
