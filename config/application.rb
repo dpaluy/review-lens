@@ -1,11 +1,6 @@
 require_relative "boot"
 
 require "rails/all"
-require "ruby_llm"
-
-RubyLLM.configure do |config|
-  config.use_new_acts_as = true
-end
 
 # Require the gems listed in Gemfile, including any gems
 # you've limited to :test, :development, or :production.

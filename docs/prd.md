@@ -1230,7 +1230,7 @@ env:
   clear:
     RAILS_ENV: production
     RAILS_LOG_TO_STDOUT: true
-    RUBYLLM_MODEL: gpt-4.1-mini
+    RUBYLLM_MODEL: gpt-5.4-mini
   secret:
     - RAILS_MASTER_KEY
     - DATABASE_URL

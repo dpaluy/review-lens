@@ -133,6 +133,30 @@ bin/kamal accessory logs db      # tail Postgres logs
 bin/kamal dbc                    # Rails dbconsole
 ```
 
+### Registry quota recovery
+
+If deploy fails while pushing the image with `denied: quota exceeded`, the
+DigitalOcean Container Registry is full before Kamal can publish the new image.
+Free space first, then rerun the deploy:
+
+```bash
+export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI
+export DIGITALOCEAN_API_TOKEN=$(op read "op://reviewlens/digitalocean/credential" --account "$OP_ACCOUNT")
+bin/prune-docr-repository
+bin/kamal deploy
+```
+
+The prune script keeps the newest 5 manifests in
+`registry.digitalocean.com/reviewlens/review_lens`, deletes older manifests,
+then starts DigitalOcean garbage collection with untagged manifests included.
+Change the retention window with `DOCR_KEEP_MANIFESTS=10`. Preview without
+deleting with `DRY_RUN=1 bin/prune-docr-repository`.
+
+DigitalOcean requires garbage collection after deleting old manifests before
+registry storage is actually reclaimed. During garbage collection the registry
+may be temporarily unavailable for pushes, so run the prune step before starting
+a new Kamal build.
+
 ## Database topology
 
 A single Postgres instance hosts four databases:
