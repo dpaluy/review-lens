@@ -137,7 +137,10 @@ bin/kamal dbc                    # Rails dbconsole
 
 If deploy fails while pushing the image with `denied: quota exceeded`, the
 DigitalOcean Container Registry is full before Kamal can publish the new image.
-Free space first, then rerun the deploy:
+Kamal runs `.kamal/hooks/pre-build`, which prunes old registry manifests and
+waits for DigitalOcean garbage collection before every build.
+
+To run the same recovery manually:
 
 ```bash
 export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI
@@ -146,16 +149,19 @@ bin/prune-docr-repository
 bin/kamal deploy
 ```
 
-The prune script keeps the newest 5 manifests in
-`registry.digitalocean.com/reviewlens/review_lens`, deletes older manifests,
-then starts DigitalOcean garbage collection with untagged manifests included.
-Change the retention window with `DOCR_KEEP_MANIFESTS=10`. Preview without
-deleting with `DRY_RUN=1 bin/prune-docr-repository`.
+The prune script uses the DigitalOcean API directly, keeps the newest tagged
+manifest in `registry.digitalocean.com/reviewlens/review_lens`, deletes older
+or untagged manifests, then starts DigitalOcean garbage collection with untagged
+manifests included and waits for it to finish. Change the retention window with
+`DOCR_KEEP_MANIFESTS=3`. If the registry tier is too small to hold the retained
+image and the next pushed image at the same time, use `DOCR_KEEP_MANIFESTS=0`
+for the next deploy. Preview without deleting with
+`DRY_RUN=1 bin/prune-docr-repository`.
 
 DigitalOcean requires garbage collection after deleting old manifests before
-registry storage is actually reclaimed. During garbage collection the registry
-may be temporarily unavailable for pushes, so run the prune step before starting
-a new Kamal build.
+registry storage is actually reclaimed. The hook waits because pushing while
+garbage collection is still active or unreclaimed can still fail with quota
+errors.
 
 ## Database topology
 
