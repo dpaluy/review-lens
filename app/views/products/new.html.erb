@@ -1,0 +1,23 @@
+<main>
+  <h1>ReviewLens AI</h1>
+
+  <%= form_with model: @product do |form| %>
+    <% if @product.errors.any? %>
+      <div>
+        <h2>Review URL could not be accepted</h2>
+        <ul>
+          <% @product.errors.full_messages.each do |message| %>
+            <li><%= message %></li>
+          <% end %>
+        </ul>
+      </div>
+    <% end %>
+
+    <div>
+      <%= form.label :source_url, "Review platform URL" %>
+      <%= form.url_field :source_url, placeholder: "https://www.getapp.com/customer-management-software/a/hubspot-crm/" %>
+    </div>
+
+    <%= form.submit "Ingest Reviews" %>
+  <% end %>
+</main>
