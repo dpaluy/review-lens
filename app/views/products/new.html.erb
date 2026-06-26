@@ -63,13 +63,18 @@
         <div style="margin-bottom:16px;">
           <label style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Product name <span style="font-weight:400;text-transform:none;">(optional)</span></label>
           <%= form.text_field :name, placeholder: "QuickBooks",
+            disabled: true,
+            data: { "import-mode-target": "csvInput" },
             style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
         </div>
 
         <div style="margin-bottom:16px;">
-          <label style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Source URL <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+          <label for="product_manual_source_url" style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Source URL <span style="font-weight:400;text-transform:none;">(optional)</span></label>
           <%= form.url_field :source_url,
+            id: "product_manual_source_url",
             placeholder: "https://www.trustpilot.com/review/…",
+            disabled: true,
+            data: { "import-mode-target": "csvInput" },
             style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
         </div>
 
@@ -83,6 +88,8 @@
         </div>
         <%= form.text_area :manual_reviews, rows: 7,
           placeholder: "Paste one review per block. Separate reviews with a blank line.",
+          disabled: true,
+          data: { "import-mode-target": "csvInput" },
           style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;resize:vertical;" %>
       </div>
 

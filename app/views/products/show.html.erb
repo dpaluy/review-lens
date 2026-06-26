@@ -123,15 +123,15 @@
       <%# Counter cells %>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
         <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:8px;padding:12px 14px;">
-          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;text-transform:uppercase;letter-spacing:0.04em;">Pages attempted</p>
+          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;letter-spacing:0.04em;">Pages attempted</p>
           <p style="font-size:20px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @ingestion_run.pages_attempted %></p>
         </div>
         <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:8px;padding:12px 14px;">
-          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;text-transform:uppercase;letter-spacing:0.04em;">Reviews found</p>
+          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;letter-spacing:0.04em;">Reviews found</p>
           <p style="font-size:20px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @ingestion_run.reviews_found %></p>
         </div>
         <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:8px;padding:12px 14px;">
-          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;text-transform:uppercase;letter-spacing:0.04em;">Reviews imported</p>
+          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;letter-spacing:0.04em;">Reviews imported</p>
           <p style="font-size:20px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @ingestion_run.reviews_imported %></p>
         </div>
       </div>
