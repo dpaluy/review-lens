@@ -1,6 +1,7 @@
 require "test_helper"
 
 class ChatMessageTest < ActiveSupport::TestCase
+  include ActionCable::TestHelper
   setup do
     RubyLLM.config.openai_api_key = "test-openai-key"
   end
@@ -45,5 +46,17 @@ class ChatMessageTest < ActiveSupport::TestCase
 
     assert_includes html, "Users praise reliable automations."
     assert_includes html, "Confidence: high"
+  end
+
+  test "broadcast_render_in_conversation publishes a replace turbo stream with rendered markdown" do
+    conversation = Conversation.create!(product: products(:ready))
+    chat_message = conversation.chat_messages.create!(role: "assistant", content: "**bold answer**")
+
+    chat_message.broadcast_render_in_conversation
+
+    raw = broadcasts("conversation_#{conversation.id}").map { |m| JSON.parse(m) rescue m }.join
+    assert_match(%r{action="replace" target="chat_message_#{chat_message.id}"}, raw)
+    assert_includes raw, %(class="rl-markdown")
+    assert_includes raw, "<strong>bold answer</strong>"
   end
 end

@@ -28,5 +28,8 @@ class ConversationResponseJob < ApplicationJob
         chat_message = conversation.chat_messages.last
         chat_message&.broadcast_append_chunk(chunk.content)
       end
+
+      # Streaming appends escaped text chunks; re-render once so markdown renders.
+      conversation.chat_messages.last&.broadcast_render_in_conversation
     end
 end

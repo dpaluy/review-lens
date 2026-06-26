@@ -15,3 +15,33 @@ input,button,select,textarea{font-family:inherit;}
 @keyframes rl-pulse{0%,100%{box-shadow:0 0 0 4px rgba(31,138,91,0.18);}50%{box-shadow:0 0 0 8px rgba(31,138,91,0.04);}}
 @keyframes rl-shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
 @keyframes rl-blink{0%,80%,100%{opacity:0.2;}40%{opacity:1;}}
+
+/* Rendered markdown from assistant answers. Scoped so it never leaks into
+   the rest of the app, and plain CSS so Tailwind's purge can't drop it. */
+.rl-markdown{color:#16191d;font-size:0.95rem;line-height:1.6;word-wrap:break-word;}
+.rl-markdown>*:first-child{margin-top:0;}
+.rl-markdown>*:last-child{margin-bottom:0;}
+.rl-markdown h1,.rl-markdown h2,.rl-markdown h3,.rl-markdown h4,.rl-markdown h5,.rl-markdown h6{font-weight:600;line-height:1.25;margin:1.2em 0 0.5em;color:#0c0e10;}
+.rl-markdown h1{font-size:1.4em;}
+.rl-markdown h2{font-size:1.25em;}
+.rl-markdown h3{font-size:1.12em;}
+.rl-markdown h4,.rl-markdown h5,.rl-markdown h6{font-size:1em;}
+.rl-markdown p{margin:0.6em 0;}
+.rl-markdown a{color:#1f8a5b;text-decoration:underline;text-underline-offset:2px;}
+.rl-markdown a:hover{color:#176b48;}
+.rl-markdown strong{font-weight:600;}
+.rl-markdown ul,.rl-markdown ol{margin:0.6em 0;padding-left:1.4em;}
+.rl-markdown li{margin:0.25em 0;}
+.rl-markdown li::marker{color:#5b6770;}
+.rl-markdown blockquote{margin:0.8em 0;padding:0.2em 1em;border-left:3px solid #1f8a5b;background:#f1f5f3;color:#3a4248;border-radius:0 4px 4px 0;}
+.rl-markdown blockquote>*:first-child{margin-top:0.2em;}
+.rl-markdown blockquote>*:last-child{margin-bottom:0.2em;}
+.rl-markdown code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.875em;background:#eef0f2;padding:0.12em 0.4em;border-radius:4px;}
+.rl-markdown pre{margin:0.8em 0;padding:0.9em 1em;background:#0c0e10;color:#e6e8ea;border-radius:8px;overflow-x:auto;}
+.rl-markdown pre code{background:transparent;padding:0;font-size:0.875em;color:inherit;}
+.rl-markdown hr{margin:1.2em 0;border:none;border-top:1px solid #d8dde2;}
+.rl-markdown img{max-width:100%;height:auto;border-radius:6px;}
+.rl-markdown table{width:100%;margin:0.8em 0;border-collapse:collapse;font-size:0.9em;display:block;overflow-x:auto;}
+.rl-markdown th,.rl-markdown td{border:1px solid #d8dde2;padding:0.45em 0.7em;text-align:left;}
+.rl-markdown th{background:#f1f5f3;font-weight:600;}
+.rl-markdown tr:nth-child(even) td{background:#fafbfa;}
