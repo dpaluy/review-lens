@@ -1,0 +1,17 @@
+<main>
+  <h1><%= @product.name.presence || @product.external_id %></h1>
+
+  <dl>
+    <dt>Platform</dt>
+    <dd><%= @product.platform %></dd>
+
+    <dt>Source URL</dt>
+    <dd><%= @product.source_url %></dd>
+
+    <dt>Status</dt>
+    <dd><%= @product.ingestion_status %></dd>
+
+    <dt>Ingestion run</dt>
+    <dd><%= @ingestion_run.status %></dd>
+  </dl>
+</main>
