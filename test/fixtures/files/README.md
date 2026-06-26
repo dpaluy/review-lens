@@ -8,8 +8,10 @@ must not require live scraping or network access.
   user review cards. Expected classification: `viable`.
 - `trustpilot_thin_corpus.html`: reusable parser-facing corpus with 5 raw user
   review cards. Expected classification: `thin`.
-- `trustpilot_blocked_captcha.html`: CAPTCHA-like blocked page with no review
-  cards. Expected classification: `blocked`.
+- `trustpilot_blocked.html`: real AWS WAF / CloudFront browser-verification
+  interstitial captured from a live `trustpilot.com` 403 response (`edge.sdk
+  .awswaf.com` challenge, `Verifying your connection...`). No review cards.
+  Expected classification: `blocked`.
 
 The corpus fixtures include Trustpilot-like selectors used by the local
 adapter, plus `data-review-card="true"` markers for lightweight fixture-count

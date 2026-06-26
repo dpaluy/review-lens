@@ -50,11 +50,17 @@ module Ingestion
           next
         end
 
+        body = response.body.to_s
+
         unless success_status?(status)
-          return failure(http_error_code(status), metadata.merge(final_url: uri.to_s))
+          error_code = http_error_code(status)
+          error_metadata = metadata.merge(final_url: uri.to_s)
+          return failure(error_code, error_metadata) unless retain_body_on_error?(error_code)
+
+          error_metadata[:html_bytes] = body.bytesize
+          return Result.new(successful: false, body:, metadata: error_metadata, error_code:)
         end
 
-        body = response.body.to_s
         html_bytes = body.bytesize
         return failure("response_too_large", metadata.merge(final_url: uri.to_s, html_bytes:, max_bytes: MAX_BYTES)) if html_bytes > MAX_BYTES
 
@@ -141,6 +147,10 @@ module Ingestion
       return "blocked" if BLOCKED_HTTP_STATUSES.include?(status)
 
       "http_#{status}"
+    end
+
+    def retain_body_on_error?(error_code)
+      error_code == "blocked"
     end
 
     def resolve_redirect(current_uri, location)

@@ -20,13 +20,12 @@ class IngestReviewsJob < ApplicationJob
     fetch_result = Ingestion::Fetcher.new.fetch(product.source_url)
     update_fetch_counters(fetch_result.metadata)
 
-    return mark_failed(fetch_failure_message(fetch_result.error_code)) unless fetch_result.success?
+    unless fetch_result.success?
+      persist_probe(fetch_result) if blocked_with_body?(fetch_result)
+      return mark_failed(fetch_failure_message(fetch_result.error_code))
+    end
 
-    probe_result = probe(fetch_result)
-    ingestion_run.update!(
-      raw_fetch_metadata: { fetch: fetch_result.metadata, probe: probe_result },
-      warnings: probe_warnings(probe_result)
-    )
+    probe_result = persist_probe(fetch_result)
 
     return mark_failed(FETCH_BLOCKED_MESSAGE) if probe_result[:captcha_or_block_detected]
 
@@ -105,6 +104,19 @@ class IngestReviewsJob < ApplicationJob
         source_url: product.source_url,
         fetch_metadata: fetch_result.metadata
       ).call
+    end
+
+    def persist_probe(fetch_result)
+      probe_result = probe(fetch_result)
+      ingestion_run.update!(
+        raw_fetch_metadata: { fetch: fetch_result.metadata, probe: probe_result },
+        warnings: probe_warnings(probe_result)
+      )
+      probe_result
+    end
+
+    def blocked_with_body?(fetch_result)
+      fetch_result.error_code == "blocked" && fetch_result.body.present?
     end
 
     def probe_warnings(probe_result)

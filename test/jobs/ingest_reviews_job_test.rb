@@ -100,6 +100,26 @@ class IngestReviewsJobTest < ActiveJob::TestCase
     assert_empty product.reviews
   end
 
+  test "probes retained block body and records blocked status before failing" do
+    html = file_fixture("trustpilot_blocked.html").read
+    product = products(:missing_status_details)
+    ingestion_run = ingestion_runs(:missing_status_details)
+
+    run_with_fetch_result(ingestion_run, blocked_fetch_result(html)) do
+      IngestReviewsJob.perform_now(ingestion_run)
+    end
+
+    assert_predicate product.reload, :failed?
+    assert_predicate ingestion_run.reload, :failed?
+    assert_equal IngestReviewsJob::FETCH_BLOCKED_MESSAGE, product.ingestion_error
+    assert_equal IngestReviewsJob::FETCH_BLOCKED_MESSAGE, ingestion_run.error
+    assert_includes ingestion_run.warning_messages, IngestReviewsJob::BLOCKED_WARNING
+    assert_equal "blocked", ingestion_run.raw_fetch_metadata.fetch("probe").fetch("status")
+    assert_equal 403, ingestion_run.raw_fetch_metadata.fetch("probe").fetch("fetch_metadata").fetch("http_status")
+    assert_equal 0, ingestion_run.reviews_found
+    assert_empty product.reviews
+  end
+
   test "records thin corpus parser warning" do
     html = file_fixture("trustpilot_thin_corpus.html").read
     product = products(:missing_status_details)
@@ -119,7 +139,7 @@ class IngestReviewsJobTest < ActiveJob::TestCase
   end
 
   test "records blocked probe warning and fails before parsing" do
-    html = file_fixture("trustpilot_blocked_captcha.html").read
+    html = file_fixture("trustpilot_blocked.html").read
     product = products(:missing_status_details)
     ingestion_run = ingestion_runs(:missing_status_details)
 
@@ -195,6 +215,21 @@ class IngestReviewsJobTest < ActiveJob::TestCase
           final_url: "https://www.trustpilot.com/review/missing-status.example.com"
         },
         error_code:
+      )
+    end
+
+    def blocked_fetch_result(html, http_status: 403)
+      Ingestion::Fetcher::Result.new(
+        successful: false,
+        body: html,
+        metadata: {
+          pages_attempted: 1,
+          pages_succeeded: 0,
+          final_url: "https://www.trustpilot.com/review/missing-status.example.com",
+          http_status: http_status,
+          html_bytes: html.bytesize
+        },
+        error_code: "blocked"
       )
     end
 end

@@ -23,7 +23,7 @@ class Ingestion::FetcherTest < ActiveSupport::TestCase
     assert_equal "text/html", result.metadata[:content_type]
   end
 
-  test "fails blocked http responses before parsing" do
+  test "retains block page body for blocked http responses" do
     fetcher = Ingestion::Fetcher.new(transport: lambda { |_uri, _limits|
       Response.new(status: 403, headers: { "content-type" => "text/html" }, body: "<html>blocked</html>")
     })
@@ -32,10 +32,24 @@ class Ingestion::FetcherTest < ActiveSupport::TestCase
 
     assert_not result.success?
     assert_equal "blocked", result.error_code
-    assert_nil result.body
+    assert_equal "<html>blocked</html>", result.body
+    assert_equal 20, result.metadata[:html_bytes]
     assert_equal 403, result.metadata[:http_status]
     assert_equal 1, result.metadata[:pages_attempted]
     assert_equal 0, result.metadata[:pages_succeeded]
+  end
+
+  test "retains block page body for rate limited responses" do
+    fetcher = Ingestion::Fetcher.new(transport: lambda { |_uri, _limits|
+      Response.new(status: 429, headers: {}, body: "<html>slow down</html>")
+    })
+
+    result = fetcher.fetch("https://www.trustpilot.com/review/quickbooks.intuit.com")
+
+    assert_not result.success?
+    assert_equal "blocked", result.error_code
+    assert_equal "<html>slow down</html>", result.body
+    assert_equal 429, result.metadata[:http_status]
   end
 
   test "fails server error http responses before parsing" do
