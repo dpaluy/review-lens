@@ -7,7 +7,7 @@
     </span>
   </div>
 
-  <div id="chat_message_<%= assistant.id %>_content" class="whitespace-pre-wrap"><%= assistant.content %></div>
+  <div id="chat_message_<%= assistant.id %>_content" class="rl-markdown"><%= format_markdown(assistant.content) %></div>
 
   <% if metadata.present? %>
     <div class="space-y-2 text-sm text-gray-700">
