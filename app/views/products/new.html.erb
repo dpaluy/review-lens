@@ -1,45 +1,108 @@
-<main>
-  <h1>ReviewLens AI</h1>
+<div style="min-height:calc(100vh - 57px);display:flex;align-items:flex-start;justify-content:center;padding:48px 20px 80px;">
+  <div style="width:100%;max-width:520px;">
 
-  <%= form_with model: @product do |form| %>
+    <div style="text-align:center;margin-bottom:32px;">
+      <h1 style="font-size:24px;font-weight:700;letter-spacing:-0.02em;color:#16191d;margin:0 0 8px;">Ingest a review corpus</h1>
+      <p style="font-size:14px;color:#565b62;margin:0;">Paste a Trustpilot product URL and ReviewLens will fetch, parse, and summarise every public review.</p>
+    </div>
+
     <% if @product.errors.any? %>
-      <div>
-        <h2>Review URL could not be accepted</h2>
-        <ul>
-          <% @product.errors.full_messages.each do |message| %>
-            <li><%= message %></li>
+      <div style="background:#fbece9;border:1px solid #f0cdc7;border-radius:10px;padding:14px 16px;margin-bottom:20px;">
+        <p style="font-size:13px;font-weight:600;color:#b4382f;margin:0 0 6px;">Review URL could not be accepted</p>
+        <ul style="margin:0;padding-left:18px;">
+          <% @product.errors.full_messages.each do |msg| %>
+            <li style="font-size:13px;color:#b4382f;"><%= msg %></li>
           <% end %>
         </ul>
       </div>
     <% end %>
 
-    <fieldset>
-      <legend>Import mode</legend>
-      <div>
-        <%= form.radio_button :import_mode, "url", checked: @product.import_mode != Product::MANUAL_PLATFORM %>
-        <%= form.label :import_mode_url, "URL scrape" %>
+    <%= form_with model: @product, data: { controller: "import-mode" } do |form| %>
+
+      <%# Hidden mode field set by JS %>
+      <%= form.hidden_field :import_mode, data: { "import-mode-target": "modeInput" }, value: (@product.import_mode == Product::MANUAL_PLATFORM ? "manual" : "url") %>
+
+      <%# Segmented control %>
+      <div style="background:#f0f0ee;border-radius:10px;padding:4px;display:flex;gap:4px;margin-bottom:20px;">
+        <button type="button"
+          data-import-mode-target="urlBtn"
+          data-action="click->import-mode#showUrl"
+          style="flex:1;padding:7px 10px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;background:#fff;color:#16191d;box-shadow:0 1px 2px rgba(0,0,0,0.10);">
+          URL scrape
+        </button>
+        <button type="button"
+          data-import-mode-target="csvBtn"
+          data-action="click->import-mode#showCsv"
+          style="flex:1;padding:7px 10px;border:none;border-radius:7px;font-size:13px;font-weight:500;cursor:pointer;background:transparent;color:#6b7280;">
+          CSV upload
+        </button>
       </div>
-      <div>
-        <%= form.radio_button :import_mode, Product::MANUAL_PLATFORM, checked: @product.import_mode == Product::MANUAL_PLATFORM %>
-        <%= form.label :import_mode_manual, "Manual paste" %>
+
+      <%# URL section %>
+      <div data-import-mode-target="urlSection">
+        <div style="margin-bottom:16px;">
+          <label for="product_source_url" style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Review platform URL</label>
+          <%= form.url_field :source_url,
+            placeholder: "https://www.trustpilot.com/review/…",
+            style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#16191d;background:#fff;outline:none;transition:border-color 0.15s;",
+            data: { "import-mode-target": "urlInput" } %>
+        </div>
+
+        <div style="margin-bottom:20px;">
+          <span style="font-size:12px;color:#8a9099;margin-right:6px;">Try:</span>
+          <button type="button"
+            style="font-size:12px;color:#1f8a5b;background:#eaf5ef;border:1px solid #d4e8dd;border-radius:20px;padding:3px 10px;cursor:pointer;"
+            data-action="click->import-mode#fillSample">
+            trustpilot.com/review/quickbooks.intuit.com
+          </button>
+        </div>
       </div>
-    </fieldset>
 
-    <div>
-      <%= form.label :name, "Product name" %>
-      <%= form.text_field :name, placeholder: "QuickBooks" %>
-    </div>
+      <%# CSV / Manual section %>
+      <div data-import-mode-target="csvSection" hidden>
+        <div style="margin-bottom:16px;">
+          <label style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Product name <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+          <%= form.text_field :name, placeholder: "QuickBooks",
+            disabled: true,
+            data: { "import-mode-target": "csvInput" },
+            style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
+        </div>
 
-    <div>
-      <%= form.label :source_url, "Review platform URL" %>
-      <%= form.url_field :source_url, placeholder: "https://www.trustpilot.com/review/quickbooks.intuit.com" %>
-    </div>
+        <div style="margin-bottom:16px;">
+          <label for="product_manual_source_url" style="display:block;font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:6px;">Source URL <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+          <%= form.url_field :source_url,
+            id: "product_manual_source_url",
+            placeholder: "https://www.trustpilot.com/review/…",
+            disabled: true,
+            data: { "import-mode-target": "csvInput" },
+            style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-family:'JetBrains Mono',monospace;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
+        </div>
 
-    <div>
-      <%= form.label :manual_reviews, "Pasted review blocks" %>
-      <%= form.text_area :manual_reviews, rows: 12, placeholder: "Paste one review per block. Separate reviews with a blank line." %>
-    </div>
+        <div style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+          <label style="font-size:12px;font-weight:600;color:#565b62;letter-spacing:0.04em;text-transform:uppercase;">Paste reviews</label>
+          <a href="#" style="font-size:12px;color:#1f8a5b;text-decoration:none;">Download sample CSV</a>
+        </div>
+        <div style="border:2px dashed #d4e8dd;border-radius:10px;background:#f7fcf9;padding:28px 20px;text-align:center;margin-bottom:8px;">
+          <p style="font-size:13px;color:#565b62;margin:0 0 6px;">Drag &amp; drop a CSV here, or paste text below</p>
+          <p style="font-size:12px;color:#8a9099;margin:0;">Columns: <code style="font-family:'JetBrains Mono',monospace;font-size:11px;background:#e8ede9;padding:1px 5px;border-radius:4px;">title, body, rating, reviewer, date</code></p>
+        </div>
+        <%= form.text_area :manual_reviews, rows: 7,
+          placeholder: "Paste one review per block. Separate reviews with a blank line.",
+          disabled: true,
+          data: { "import-mode-target": "csvInput" },
+          style: "width:100%;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;resize:vertical;" %>
+      </div>
 
-    <%= form.submit "Ingest Reviews" %>
-  <% end %>
-</main>
+      <button type="submit"
+        style="width:100%;margin-top:8px;padding:12px 20px;background:#1f8a5b;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;letter-spacing:-0.01em;transition:background 0.15s;"
+        onmouseover="this.style.background='#1a754d'" onmouseout="this.style.background='#1f8a5b'">
+        Ingest Reviews
+      </button>
+
+    <% end %>
+
+    <p style="text-align:center;font-size:12px;color:#8a9099;margin-top:20px;">
+      Supported: <strong style="color:#565b62;">Trustpilot</strong> &middot; G2 (smoke-test) &middot; Manual import
+    </p>
+  </div>
+</div>

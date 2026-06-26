@@ -8,3 +8,10 @@
  *
  * Consider organizing styles into separate files for maintainability.
  */
+*,*::before,*::after{box-sizing:border-box;}
+body{margin:0;font-family:'Inter',sans-serif;background:#f7f7f5;min-height:100vh;color:#16191d;-webkit-font-smoothing:antialiased;}
+::placeholder{color:#aeb4bb;}
+input,button,select,textarea{font-family:inherit;}
+@keyframes rl-pulse{0%,100%{box-shadow:0 0 0 4px rgba(31,138,91,0.18);}50%{box-shadow:0 0 0 8px rgba(31,138,91,0.04);}}
+@keyframes rl-shimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+@keyframes rl-blink{0%,80%,100%{opacity:0.2;}40%{opacity:1;}}

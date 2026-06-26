@@ -5,7 +5,7 @@ class ManualImportFlowTest < ActionDispatch::IntegrationTest
     get new_product_path
 
     assert_response :success
-    assert_select "input[type=radio][name='product[import_mode]'][value='manual']"
+    assert_select "input[type=hidden][name='product[import_mode]']"
     assert_select "textarea[name='product[manual_reviews]']"
 
     pasted_reviews = <<~TEXT

@@ -1,64 +1,509 @@
-<main>
-  <h1><%= @product.name.presence || @product.external_id %></h1>
+<%
+  pipeline   = @product.ingestion_status
+  sec_failed = @product.failed? || @ingestion_run.failed?
+  sec_ready  = @product.ready?
+  sec_full   = sec_ready && @product.reviews_count > 0
+  sec_empty  = sec_ready && @product.reviews_count == 0
+  sec_skeleton = !sec_ready && !sec_failed
+  is_thin    = sec_full && @product.thin_corpus?
 
-  <% failure_message = @product.ingestion_error.presence || @ingestion_run.error.presence %>
-  <% if @product.failed? || @ingestion_run.failed? %>
-    <section data-testid="failure-state" role="alert">
-      <h2>Failure</h2>
-      <p><%= failure_message.presence || "Ingestion failed without a recorded error." %></p>
-    </section>
+  skipped       = @ingestion_run.reviews_skipped.to_i
+  has_warning_messages = @ingestion_run.warning_messages.any?
+  show_warnings = has_warning_messages || (sec_full && skipped > 0)
+
+  steps     = %w[pending fetching parsing summarizing ready]
+  cur_idx   = steps.index(pipeline) || 0
+%>
+
+<% if sec_skeleton %>
+  <% content_for :head do %>
+    <meta http-equiv="refresh" content="3">
   <% end %>
+<% end %>
 
-  <% if @product.thin_corpus? %>
-    <section data-testid="thin-corpus-warning" role="alert">
-      <h2>Thin corpus</h2>
-      <p>
-        Only <%= pluralize(@product.usable_review_count, "usable review") %> available.
-        ReviewLens needs least <%= Product::MINIMUM_USABLE_REVIEW_COUNT %> usable reviews for grounded answers.
-      </p>
-    </section>
-  <% end %>
+<div style="max-width:860px;margin:0 auto;padding:32px 20px 80px;">
 
-  <% if @ingestion_run.warning_messages.any? %>
-    <section data-testid="parser-warnings" role="alert">
-      <h2>Parser warnings</h2>
-      <ul>
-        <% @ingestion_run.warning_messages.each do |warning_message| %>
-          <li><%= warning_message %></li>
+  <%# ── Product header ── %>
+  <div style="margin-bottom:28px;">
+    <p style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:#8a9099;margin:0 0 6px;">/products/<%= @product.external_id %></p>
+    <h1 style="font-size:22px;font-weight:700;letter-spacing:-0.02em;color:#16191d;margin:0 0 10px;"><%= @product.name.presence || @product.external_id %></h1>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <span style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:500;background:#eaf5ef;color:#166b47;border:1px solid #d4e8dd;border-radius:20px;padding:3px 10px;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#1f8a5b;display:inline-block;"></span>
+        <%= @product.platform&.capitalize %>
+      </span>
+      <% if @product.source_url.present? %>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#565b62;background:#f0f0ee;border:1px solid #e6e6e2;border-radius:20px;padding:3px 10px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+          <%= @product.source_url %>
+        </span>
+      <% end %>
+      <% if sec_ready %>
+        <span style="font-size:12px;font-weight:500;color:#565b62;background:#f0f0ee;border:1px solid #e6e6e2;border-radius:20px;padding:3px 10px;">
+          <%= pluralize(@product.reviews_count, "review") %>
+        </span>
+      <% end %>
+    </div>
+  </div>
+
+  <%# ═══════════════════════════════════════════════ %>
+  <%# Section 01: Ingestion status (collapsible)      %>
+  <%# ═══════════════════════════════════════════════ %>
+  <div style="background:#fff;border:1px solid #e6e6e2;border-radius:12px;margin-bottom:12px;overflow:hidden;"
+    data-controller="collapsible"
+    data-collapsible-open-value="<%= sec_failed || sec_skeleton ? 'true' : 'false' %>">
+
+    <div data-action="click->collapsible#toggle"
+      style="display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8a9099;min-width:24px;">01</span>
+      <span style="font-size:14px;font-weight:600;color:#16191d;flex:1;">Ingestion status</span>
+      <% if sec_failed %>
+        <span style="font-size:11px;font-weight:600;background:#fbece9;color:#b4382f;border:1px solid #f0cdc7;border-radius:20px;padding:2px 8px;">Failed</span>
+      <% elsif sec_ready %>
+        <span style="font-size:11px;font-weight:600;background:#eaf5ef;color:#166b47;border:1px solid #d4e8dd;border-radius:20px;padding:2px 8px;">Ready</span>
+      <% else %>
+        <span style="font-size:11px;font-weight:600;background:#fbf3e2;color:#c08a1e;border:1px solid #efdcae;border-radius:20px;padding:2px 8px;"><%= pipeline&.capitalize %></span>
+      <% end %>
+      <svg data-collapsible-chevron-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <div data-collapsible-content-target="content" style="border-top:1px solid #f0f0ee;padding:20px;">
+
+      <%# Stepper %>
+      <div style="position:relative;margin-bottom:24px;">
+        <%# Background progress line %>
+        <div style="position:absolute;top:16px;left:16px;right:16px;height:2px;background:#f0f0ee;z-index:0;"></div>
+        <%
+          line_pct = if sec_failed
+            12
+          else
+            cur_idx == 0 ? 0 : (cur_idx.to_f / 4 * 100).round
+          end
+        %>
+        <div style="position:absolute;top:16px;left:16px;height:2px;background:#1f8a5b;z-index:1;width:<%= line_pct %>%;transition:width 0.4s;"></div>
+
+        <div style="display:flex;justify-content:space-between;position:relative;z-index:2;">
+          <% [["Queued","pending"],["Fetching","fetching"],["Parsing","parsing"],["Summarizing","summarizing"],["Ready","ready"]].each_with_index do |(label, key), idx| %>
+            <%
+              if sec_failed && idx == cur_idx
+                step_state = "failed"
+              elsif idx < cur_idx || (sec_ready && idx == 4)
+                step_state = "done"
+              elsif idx == cur_idx && !sec_ready
+                step_state = "active"
+              else
+                step_state = "todo"
+              end
+
+              circle_style = case step_state
+              when "done"    then "width:32px;height:32px;border-radius:50%;background:#1f8a5b;border:2px solid #1f8a5b;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;"
+              when "active"  then "width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid #1f8a5b;display:flex;align-items:center;justify-content:center;animation:rl-pulse 2s infinite;"
+              when "failed"  then "width:32px;height:32px;border-radius:50%;background:#b4382f;border:2px solid #b4382f;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700;"
+              else               "width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid #e6e6e2;display:flex;align-items:center;justify-content:center;"
+              end
+
+              label_style = case step_state
+              when "done"    then "font-size:11px;font-weight:600;color:#16191d;margin-top:6px;text-align:center;"
+              when "active"  then "font-size:11px;font-weight:600;color:#1f8a5b;margin-top:6px;text-align:center;"
+              when "failed"  then "font-size:11px;font-weight:600;color:#b4382f;margin-top:6px;text-align:center;"
+              else               "font-size:11px;color:#8a9099;margin-top:6px;text-align:center;"
+              end
+            %>
+            <div style="display:flex;flex-direction:column;align-items:center;">
+              <div style="<%= circle_style %>">
+                <% if step_state == "done" %>&#10003;<% elsif step_state == "failed" %>&#10005;<% end %>
+              </div>
+              <span style="<%= label_style %>"><%= label %></span>
+            </div>
+          <% end %>
+        </div>
+      </div>
+
+      <%# Counter cells %>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;">
+        <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:8px;padding:12px 14px;">
+          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;letter-spacing:0.04em;">Pages attempted</p>
+          <p style="font-size:20px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @ingestion_run.pages_attempted %></p>
+        </div>
+        <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:8px;padding:12px 14px;">
+          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;letter-spacing:0.04em;">Reviews found</p>
+          <p style="font-size:20px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @ingestion_run.reviews_found %></p>
+        </div>
+        <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:8px;padding:12px 14px;">
+          <p style="font-size:11px;color:#8a9099;margin:0 0 3px;letter-spacing:0.04em;">Reviews imported</p>
+          <p style="font-size:20px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @ingestion_run.reviews_imported %></p>
+        </div>
+      </div>
+
+      <%# Parser warnings banner %>
+      <% if show_warnings %>
+        <div style="background:#fbf3e2;border:1px solid #efdcae;border-radius:8px;padding:12px 14px;margin-bottom:12px;" data-testid="parser-warnings" role="alert">
+          <p style="font-size:13px;color:#c08a1e;font-weight:600;margin:0 0 4px;">Parser warnings</p>
+          <p style="font-size:13px;color:#8a5e10;margin:0;"><%= pluralize(skipped, "review") %> skipped during import.</p>
+          <% if @ingestion_run.warning_messages.any? %>
+            <ul style="margin:6px 0 0;padding-left:18px;">
+              <% @ingestion_run.warning_messages.each do |msg| %>
+                <li style="font-size:12px;color:#8a5e10;"><%= msg %></li>
+              <% end %>
+            </ul>
+          <% end %>
+        </div>
+      <% end %>
+
+      <%# Failed banner %>
+      <% if sec_failed %>
+        <div style="background:#fbece9;border:1px solid #f0cdc7;border-radius:8px;padding:14px 16px;" role="alert" data-testid="failure-state">
+          <p style="font-size:13px;font-weight:600;color:#b4382f;margin:0 0 4px;">Ingestion failed</p>
+          <% failure_message = @product.ingestion_error.presence || @ingestion_run.error.presence %>
+          <p style="font-size:13px;color:#b4382f;margin:0 0 12px;"><%= failure_message.presence || "Ingestion failed without a recorded error." %></p>
+          <%= link_to "Try manual import", new_product_path(import_mode: "manual"),
+            style: "display:inline-block;font-size:13px;font-weight:600;color:#fff;background:#b4382f;border-radius:7px;padding:7px 14px;text-decoration:none;" %>
+        </div>
+      <% end %>
+
+    </div>
+  </div>
+
+  <%# ═══════════════════════════════════════════════ %>
+  <%# Section 02: Corpus summary (collapsible)        %>
+  <%# ═══════════════════════════════════════════════ %>
+  <div style="background:#fff;border:1px solid #e6e6e2;border-radius:12px;margin-bottom:12px;overflow:hidden;"
+    data-controller="collapsible">
+
+    <div data-action="click->collapsible#toggle"
+      style="display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8a9099;min-width:24px;">02</span>
+      <span style="font-size:14px;font-weight:600;color:#16191d;flex:1;">Corpus summary</span>
+      <% if is_thin %>
+        <span style="font-size:11px;font-weight:600;background:#fbf3e2;color:#c08a1e;border:1px solid #efdcae;border-radius:20px;padding:2px 8px;">Thin corpus</span>
+      <% end %>
+      <svg data-collapsible-chevron-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <div data-collapsible-content-target="content" style="border-top:1px solid #f0f0ee;padding:20px;">
+
+      <% if sec_full %>
+
+        <% if is_thin %>
+          <div style="background:#fbf3e2;border:1px solid #efdcae;border-radius:8px;padding:12px 14px;margin-bottom:16px;" data-testid="thin-corpus-warning" role="alert">
+            <p style="font-size:13px;font-weight:600;color:#c08a1e;margin:0 0 3px;">Thin corpus</p>
+            <p style="font-size:13px;color:#8a5e10;margin:0;">Only <%= pluralize(@product.usable_review_count, "usable review") %> available. ReviewLens needs least <%= Product::MINIMUM_USABLE_REVIEW_COUNT %> usable reviews for grounded answers.</p>
+          </div>
         <% end %>
-      </ul>
-    </section>
-  <% end %>
 
-  <dl>
-    <dt>Platform</dt>
-    <dd><%= @product.platform %></dd>
+        <%# 4-card stats grid %>
+        <%
+          pos_pct  = @product.sentiment_distribution&.dig("positive").to_f.round
+          neu_pct  = @product.sentiment_distribution&.dig("neutral").to_f.round
+          neg_pct  = @product.sentiment_distribution&.dig("negative").to_f.round
+          avg_rat  = @product.average_rating&.to_f&.round(1)
 
-    <dt>Source URL</dt>
-    <dd><%= @product.source_url %></dd>
+          oldest_str = @product.oldest_review_at&.strftime("%b %Y")
+          newest_str = @product.newest_review_at&.strftime("%b %Y")
+        %>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:20px;">
+          <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px;padding:14px 16px;">
+            <p style="font-size:11px;color:#8a9099;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.04em;">Reviews imported</p>
+            <p style="font-size:26px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= @product.reviews_count %></p>
+          </div>
+          <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px;padding:14px 16px;">
+            <p style="font-size:11px;color:#8a9099;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.04em;">Average rating</p>
+            <p style="font-size:26px;font-weight:700;color:#16191d;margin:0;font-family:'JetBrains Mono',monospace;"><%= avg_rat || "—" %><span style="font-size:14px;color:#8a9099;">★ /5</span></p>
+          </div>
+          <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px;padding:14px 16px;">
+            <p style="font-size:11px;color:#8a9099;margin:0 0 8px;text-transform:uppercase;letter-spacing:0.04em;">Sentiment split</p>
+            <div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-bottom:6px;">
+              <div style="width:<%= pos_pct %>%;background:#1f8a5b;"></div>
+              <div style="width:<%= neu_pct %>%;background:#c2c6cc;"></div>
+              <div style="width:<%= neg_pct %>%;background:#b4382f;"></div>
+            </div>
+            <div style="display:flex;gap:10px;font-size:11px;">
+              <span style="color:#1f8a5b;font-weight:600;"><%= pos_pct %>% pos</span>
+              <span style="color:#8a9099;"><%= neu_pct %>% neu</span>
+              <span style="color:#b4382f;font-weight:600;"><%= neg_pct %>% neg</span>
+            </div>
+          </div>
+          <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px;padding:14px 16px;">
+            <p style="font-size:11px;color:#8a9099;margin:0 0 4px;text-transform:uppercase;letter-spacing:0.04em;">Date range</p>
+            <% if oldest_str && newest_str %>
+              <p style="font-size:14px;font-weight:600;color:#16191d;margin:0;"><%= oldest_str %> – <%= newest_str %></p>
+            <% else %>
+              <p style="font-size:14px;color:#8a9099;margin:0;">Not recorded</p>
+            <% end %>
+          </div>
+        </div>
 
-    <dt>Product status</dt>
-    <dd><%= @product.ingestion_status %></dd>
+        <%# Rating distribution bars %>
+        <%
+          dist = @product.rating_distribution || {}
+          max_count = dist.values.map(&:to_i).max.to_f
+          max_count = 1.0 if max_count.zero?
+        %>
+        <div style="margin-bottom:20px;">
+          <p style="font-size:12px;font-weight:600;color:#565b62;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 10px;">Rating distribution</p>
+          <% [5,4,3,2,1].each do |star| %>
+            <% count = dist[star.to_s].to_i %>
+            <% bar_pct = (count / max_count * 100).round %>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px;">
+              <span style="font-size:12px;color:#565b62;width:24px;text-align:right;flex-shrink:0;"><%= star %>★</span>
+              <div style="flex:1;height:8px;background:#f0f0ee;border-radius:4px;overflow:hidden;">
+                <div style="width:<%= bar_pct %>%;height:100%;background:<%= star >= 4 ? '#1f8a5b' : star == 3 ? '#c08a1e' : '#b4382f' %>;border-radius:4px;"></div>
+              </div>
+              <span style="font-size:12px;color:#8a9099;width:28px;flex-shrink:0;"><%= count %></span>
+            </div>
+          <% end %>
+        </div>
 
-    <dt>Run status</dt>
-    <dd><%= @ingestion_run.status %></dd>
+        <%# Field coverage table %>
+        <% if @field_coverage.present? %>
+          <div>
+            <p style="font-size:12px;font-weight:600;color:#565b62;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 10px;">Field coverage</p>
+            <div style="border:1px solid #e6e6e2;border-radius:8px;overflow:hidden;">
+              <% @field_coverage.each_with_index do |row, idx| %>
+                <div style="display:flex;align-items:center;gap:12px;padding:9px 14px;<%= idx < @field_coverage.length - 1 ? 'border-bottom:1px solid #f0f0ee;' : '' %>background:<%= idx.even? ? '#fff' : '#fafaf9' %>;">
+                  <span style="font-size:12px;color:#565b62;flex:1;"><%= row[:field] %></span>
+                  <div style="width:120px;height:5px;background:#f0f0ee;border-radius:3px;overflow:hidden;">
+                    <div style="width:<%= row[:pct] %>%;height:100%;background:<%= row[:bar_color] %>;border-radius:3px;"></div>
+                  </div>
+                  <span style="font-size:12px;font-weight:600;color:<%= row[:ink_color] %>;width:36px;text-align:right;font-family:'JetBrains Mono',monospace;"><%= row[:pct] %>%</span>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        <% end %>
 
-    <dt>Usable reviews</dt>
-    <dd><%= @product.usable_review_count %></dd>
+      <% elsif sec_skeleton %>
+        <%# Shimmer skeletons %>
+        <% 4.times do %>
+          <div style="height:80px;background:linear-gradient(90deg,#f0f0ee 25%,#e6e6e2 50%,#f0f0ee 75%);background-size:400% 100%;border-radius:10px;margin-bottom:10px;animation:rl-shimmer 1.5s infinite;"></div>
+        <% end %>
 
-    <dt>Pages attempted</dt>
-    <dd><%= @ingestion_run.pages_attempted.presence || "Not recorded" %></dd>
+      <% elsif sec_empty %>
+        <div style="text-align:center;padding:24px;">
+          <p style="font-size:14px;color:#565b62;margin:0 0 12px;">0 reviews imported.</p>
+          <%= link_to "Try manual import", new_product_path(import_mode: "manual"),
+            style: "display:inline-block;font-size:13px;font-weight:600;color:#1f8a5b;background:#eaf5ef;border:1px solid #d4e8dd;border-radius:7px;padding:7px 14px;text-decoration:none;" %>
+        </div>
 
-    <dt>Pages succeeded</dt>
-    <dd><%= @ingestion_run.pages_succeeded.presence || "Not recorded" %></dd>
+      <% elsif sec_failed %>
+        <p style="font-size:14px;color:#8a9099;margin:0;">Summary unavailable.</p>
+      <% end %>
 
-    <dt>Reviews found</dt>
-    <dd><%= @ingestion_run.reviews_found.presence || "Not recorded" %></dd>
+    </div>
+  </div>
 
-    <dt>Reviews imported</dt>
-    <dd><%= @ingestion_run.reviews_imported.presence || "Not recorded" %></dd>
+  <%# ═══════════════════════════════════════════════ %>
+  <%# Section 03: Sample reviews (collapsible)        %>
+  <%# ═══════════════════════════════════════════════ %>
+  <div style="background:#fff;border:1px solid #e6e6e2;border-radius:12px;margin-bottom:12px;overflow:hidden;"
+    data-controller="collapsible">
 
-    <dt>Reviews skipped</dt>
-    <dd><%= @ingestion_run.reviews_skipped.presence || "Not recorded" %></dd>
-  </dl>
-</main>
+    <div data-action="click->collapsible#toggle"
+      style="display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8a9099;min-width:24px;">03</span>
+      <span style="font-size:14px;font-weight:600;color:#16191d;flex:1;">Sample reviews</span>
+      <% if sec_full %>
+        <span style="font-size:11px;color:#8a9099;">Top <%= [@sample_reviews&.size || 0, 10].min %></span>
+      <% end %>
+      <svg data-collapsible-chevron-target="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" style="color:#8a9099;transition:transform 0.2s;flex-shrink:0;">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+
+    <div data-collapsible-content-target="content" style="border-top:1px solid #f0f0ee;">
+
+      <% if sec_full %>
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;">
+            <thead>
+              <tr style="background:#f7f7f5;border-bottom:1px solid #e6e6e2;">
+                <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:#8a9099;text-transform:uppercase;letter-spacing:0.04em;width:70px;">Rating</th>
+                <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:#8a9099;text-transform:uppercase;letter-spacing:0.04em;width:200px;">Title</th>
+                <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:#8a9099;text-transform:uppercase;letter-spacing:0.04em;">Excerpt</th>
+                <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:#8a9099;text-transform:uppercase;letter-spacing:0.04em;width:120px;">Source</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% @sample_reviews.each_with_index do |review, idx| %>
+                <%
+                  rat = review.rating.to_f
+                  rat_bg    = rat >= 4 ? "#eaf5ef" : rat == 3 ? "#f0f0ee" : "#fbece9"
+                  rat_color = rat >= 4 ? "#166b47" : rat == 3 ? "#565b62" : "#b4382f"
+                %>
+                <tr style="border-bottom:1px solid #f0f0ee;<%= idx.even? ? '' : 'background:#fafaf9;' %>">
+                  <td style="padding:10px 14px;">
+                    <span style="display:inline-block;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:600;background:<%= rat_bg %>;color:<%= rat_color %>;border-radius:6px;padding:2px 7px;"><%= review.rating.present? ? "#{review.rating.to_i}★" : "—" %></span>
+                  </td>
+                  <td style="padding:10px 14px;font-weight:500;color:#16191d;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= truncate(review.title.presence || "Untitled", length: 50) %></td>
+                  <td style="padding:10px 14px;color:#565b62;max-width:340px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><%= truncate(review.body.to_s, length: 120) %></td>
+                  <td style="padding:10px 14px;">
+                    <% if review.source_url.present? %>
+                      <a href="<%= review.source_url %>" target="_blank" rel="noopener"
+                        style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#1f8a5b;background:#eaf5ef;border:1px solid #d4e8dd;border-radius:20px;padding:2px 8px;text-decoration:none;white-space:nowrap;overflow:hidden;display:inline-block;max-width:110px;text-overflow:ellipsis;">
+                        <%= URI.parse(review.source_url).host rescue review.source_url %>
+                      </a>
+                    <% else %>
+                      <span style="font-size:11px;color:#8a9099;">—</span>
+                    <% end %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+
+      <% elsif sec_skeleton %>
+        <div style="padding:16px;">
+          <% 5.times do %>
+            <div style="height:40px;background:linear-gradient(90deg,#f0f0ee 25%,#e6e6e2 50%,#f0f0ee 75%);background-size:400% 100%;border-radius:6px;margin-bottom:8px;animation:rl-shimmer 1.5s infinite;"></div>
+          <% end %>
+        </div>
+
+      <% else %>
+        <div style="padding:24px;text-align:center;">
+          <p style="font-size:14px;color:#8a9099;margin:0;">
+            <% if sec_failed %>Reviews unavailable — ingestion failed.<% else %>No reviews imported yet.<% end %>
+          </p>
+        </div>
+      <% end %>
+
+    </div>
+  </div>
+
+  <%# ═══════════════════════════════════════════════ %>
+  <%# Section 04: Ask the reviews (not collapsible)   %>
+  <%# ═══════════════════════════════════════════════ %>
+  <div style="background:#fff;border:1px solid #e6e6e2;border-radius:12px;overflow:hidden;">
+
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #f0f0ee;">
+      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:#8a9099;min-width:24px;">04</span>
+      <span style="font-size:14px;font-weight:600;color:#16191d;flex:1;">Ask the reviews</span>
+      <% unless sec_full %>
+        <span style="font-size:11px;color:#8a9099;background:#f0f0ee;border:1px solid #e6e6e2;border-radius:20px;padding:2px 8px;">
+          <% if sec_failed %>Failed<% elsif sec_empty %>No data<% else %>Ingesting…<% end %>
+        </span>
+      <% end %>
+    </div>
+
+    <% if sec_full %>
+      <div style="padding:20px;" data-controller="chat">
+
+        <%# Suggested question chips %>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px;">
+          <% [
+            "Top pain points",
+            "What users praise",
+            "Objections that hurt sales",
+            "Repeated feature requests",
+            "5 negative quotes"
+          ].each do |q| %>
+            <button type="button"
+              data-action="click->chat#fill"
+              data-chat-question-param="<%= q %>"
+              style="font-size:12px;color:#1f8a5b;background:#eaf5ef;border:1px solid #d4e8dd;border-radius:20px;padding:4px 12px;cursor:pointer;font-weight:500;">
+              <%= q %>
+            </button>
+          <% end %>
+        </div>
+
+        <%# Chat frame %>
+        <turbo-frame id="chat-<%= @product.id %>">
+
+          <% if @chat_messages.empty? %>
+            <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px;padding:24px;text-align:center;margin-bottom:16px;">
+              <p style="font-size:14px;color:#8a9099;margin:0;">Ask a question about the <%= @product.name.presence || @product.external_id %> reviews.</p>
+            </div>
+          <% else %>
+            <div style="margin-bottom:16px;display:flex;flex-direction:column;gap:12px;">
+              <% @chat_messages.each do |msg| %>
+                <% if msg["role"] == "user" %>
+                  <div style="display:flex;justify-content:flex-end;">
+                    <div style="max-width:72%;background:#1f8a5b;color:#fff;border-radius:10px 10px 2px 10px;padding:10px 14px;font-size:13px;"><%= msg["text"] %></div>
+                  </div>
+                <% else %>
+                  <div style="max-width:92%;">
+                    <% if msg["confidence"] == "low" || msg["answer"].to_s.include?("AI") %>
+                      <div style="background:#fbf3e2;border:1px solid #efdcae;border-radius:10px 10px 10px 2px;padding:12px 14px;">
+                        <p style="font-size:13px;color:#8a5e10;margin:0;"><%= msg["answer"] %></p>
+                        <% if msg["limitations"].present? %>
+                          <p style="font-size:11px;color:#c08a1e;margin:6px 0 0;"><%= msg["limitations"] %></p>
+                        <% end %>
+                      </div>
+                    <% else %>
+                      <div style="background:#f7f7f5;border:1px solid #e6e6e2;border-radius:10px 10px 10px 2px;padding:12px 14px;">
+                        <p style="font-size:13px;color:#16191d;margin:0;"><%= msg["answer"] %></p>
+                        <% if msg["ids"].present? %>
+                          <p style="font-size:11px;color:#8a9099;margin:6px 0 0;">Supporting reviews: <%= msg["ids"].join(", ") %></p>
+                        <% end %>
+                        <% if msg["limitations"].present? %>
+                          <p style="font-size:11px;color:#8a9099;margin:4px 0 0;"><em><%= msg["limitations"] %></em></p>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                <% end %>
+              <% end %>
+            </div>
+          <% end %>
+
+        </turbo-frame>
+
+        <%# Input row %>
+        <%= form_with url: product_chat_messages_path(@product), method: :post, data: { turbo_frame: "chat-#{@product.id}" } do |f| %>
+          <div style="display:flex;gap:8px;align-items:flex-end;">
+            <%= f.text_field :question,
+              placeholder: "Ask anything about these reviews…",
+              data: { "chat-target": "input", action: "keydown->chat#onKeydown" },
+              style: "flex:1;padding:10px 13px;border:1.5px solid #e6e6e2;border-radius:9px;font-size:13px;color:#16191d;background:#fff;outline:none;" %>
+            <button type="submit"
+              style="padding:10px 18px;background:#1f8a5b;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;"
+              onmouseover="this.style.background='#1a754d'" onmouseout="this.style.background='#1f8a5b'">
+              Ask
+            </button>
+          </div>
+        <% end %>
+
+        <%# Blocked question chips %>
+        <div style="margin-top:14px;">
+          <p style="font-size:11px;color:#8a9099;margin:0 0 6px;">Try these blocked questions:</p>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;">
+            <% [
+              "How do G2 reviews compare?",
+              "Current weather?",
+              "Better than Zapier?"
+            ].each do |q| %>
+              <button type="button"
+                data-action="click->chat#fireBlocked"
+                data-chat-question-param="<%= q %>"
+                style="font-size:12px;color:#8a9099;background:#f0f0ee;border:1px solid #e6e6e2;border-radius:20px;padding:3px 10px;cursor:pointer;">
+                <%= q %>
+              </button>
+            <% end %>
+          </div>
+        </div>
+
+      </div>
+
+    <% else %>
+      <div style="padding:32px;text-align:center;">
+        <div style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;background:#f0f0ee;border-radius:50%;margin-bottom:12px;">
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <rect x="3" y="8" width="12" height="9" rx="2" stroke="#8a9099" stroke-width="1.5"/>
+            <path d="M6 8V5.5a3 3 0 0 1 6 0V8" stroke="#8a9099" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <p style="font-size:14px;color:#565b62;font-weight:500;margin:0 0 4px;">
+          <% if sec_failed %>Q&amp;A unavailable — ingestion failed<% elsif sec_empty %>No reviews to query<% else %>Q&amp;A unlocks when ingestion is complete<% end %>
+        </p>
+        <p style="font-size:12px;color:#8a9099;margin:0;">
+          <% if sec_skeleton %>The page will refresh automatically while ingestion is in progress.<% end %>
+        </p>
+      </div>
+    <% end %>
+
+  </div>
+
+</div>
