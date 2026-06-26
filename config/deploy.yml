@@ -59,7 +59,6 @@ env:
     - CACHE_DATABASE_URL
     - QUEUE_DATABASE_URL
     - CABLE_DATABASE_URL
-    - OPENAI_API_KEY
 
 # PostgreSQL as an on-droplet accessory. The init.sql file creates the three
 # extra databases Rails needs for Solid Cache/Queue/Cable. For a managed

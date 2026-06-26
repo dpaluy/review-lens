@@ -52,18 +52,26 @@ doctl registry login   # configures docker auth using your API token
 
 ## 3. Configure DNS + secrets
 
-All secrets live in 1Password and are resolved by `.kamal/secrets` and
-`infra/bin/provision` via the `op` CLI. Create these items in your vault
-(rename the `op://` refs in `.kamal/secrets` if your layout differs):
+Secrets are loaded lazily by `infra/bin/provision` depending on the step.
+Only two items must exist up front; the rest are created during provisioning.
+
+**Required up front (create in the `reviewlens` vault):**
 
 | Item reference | Value |
 |----------------|-------|
 | `reviewlens/digitalocean/credential` | DO API token (read/write) |
 | `reviewlens/production-rails/production_key` | contents of `config/credentials/production.key` |
-| `reviewlens/production-postgres/password` | `openssl rand -hex 24` |
-| `reviewlens/openai/api_key` | OpenAI API key |
-| `reviewlens/digitalocean-spaces/access_key_id` | DO Spaces access key |
-| `reviewlens/digitalocean-spaces/secret_access_key` | DO Spaces secret key |
+
+**Created during provisioning (do not create manually):**
+
+| Item reference | When | How |
+|----------------|------|-----|
+| `reviewlens/production-postgres/password` | first `--deploy` | `infra/bin/provision` generates it and stores it |
+| `reviewlens/digitalocean-spaces/access_key_id` | after `--infra` | you generate Spaces keys in the DO console and store them |
+| `reviewlens/digitalocean-spaces/secret_access_key` | after `--infra` | you generate Spaces keys in the DO console and store them |
+
+OpenAI key is NOT a deploy secret. It lives in `config/credentials/production.yml.enc`
+and is read at runtime by the app.
 
 Then export the non-secret deployment values:
 
@@ -79,8 +87,22 @@ are not in version control.
 
 ## 4. First deployment
 
+Use the provisioner so secrets are handled in the right order:
+
 ```bash
-bin/kamal setup    # installs Docker, boots accessories, deploys, enables SSL
+infra/bin/provision --infra    # 1. create droplet + firewall + Spaces bucket
+# 2. MANUAL: generate Spaces keys in DO console, store to 1Password
+infra/bin/provision --config   # 3. harden droplet, install Docker, backup cron
+infra/bin/provision --deploy   # 4. generate PG password, kamal setup
+```
+
+Or, for Kamal-only deploys after the droplet exists, source secrets first:
+
+```bash
+export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI
+export POSTGRES_PASSWORD=$(op read "op://reviewlens/production-postgres/password")
+export DEPLOY_HOST=<droplet-ip> DEPLOY_DOMAIN=app.cairnfoundry.com
+bin/kamal setup
 ```
 
 `kamal setup` will:

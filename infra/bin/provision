@@ -1,12 +1,26 @@
 #!/usr/bin/env bash
 # Provision ReviewLens infrastructure on DigitalOcean.
 #
-#   infra/bin/provision --infra    OpenTofu: droplet, firewall, Spaces bucket
-#   infra/bin/provision --config   Ansible: harden, Docker, backup cron
-#   infra/bin/provision --deploy   Kamal setup
-#   infra/bin/provision --all      (default) all three
+# Secrets are loaded lazily per step, because not all secrets exist up front:
 #
-# Reads variables from the environment (or terraform.tfvars). See infra/README.md.
+#   --infra    needs: DO token (1Password), SSH pubkey, ADMIN_IP
+#              creates: Droplet, firewall, DO Spaces bucket
+#
+#   [manual]   generate Spaces keys in the DO console, store to 1Password:
+#              reviewlens/digitalocean-spaces/access_key_id
+#              reviewlens/digitalocean-spaces/secret_access_key
+#
+#   --config   needs: Spaces keys (1Password), POSTGRES_PASSWORD (1Password)
+#              installs: Docker, hardening, pg_dump -> Spaces cron
+#
+#   --deploy   needs: production.key (1Password), DO token, POSTGRES_PASSWORD,
+#                     DEPLOY_DOMAIN
+#              on first run: generates + stores POSTGRES_PASSWORD to 1Password,
+#              then runs kamal setup
+#
+#   --all      runs infra -> config -> deploy in sequence (requires the manual
+#              Spaces-keys step to be done between infra and config, so --all
+#              will pause and prompt)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -18,6 +32,12 @@ log_info()  { echo -e "${GREEN}[INFO]${NC} $1"; }
 log_warn()  { echo -e "${YELLOW}[WARN]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+OP_ACCOUNT="${OP_ACCOUNT:-HOPQBD5OXZDG7M6WBMJPF6RKRI}"   # david@paluy.org
+PG_PW_REF="op://reviewlens/production-postgres/password"
+DO_REF="op://reviewlens/digitalocean/credential"
+SPACES_AK_REF="op://reviewlens/digitalocean-spaces/access_key_id"
+SPACES_SK_REF="op://reviewlens/digitalocean-spaces/secret_access_key"
+
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [OPTIONS]
@@ -27,23 +47,24 @@ Provision and configure ReviewLens on DigitalOcean.
 OPTIONS:
     --infra     Run OpenTofu (droplet, firewall, Spaces bucket)
     --config    Run Ansible (Docker, hardening, backup cron)
-    --deploy    Bootstrap Kamal
-    --all       Run all steps (default)
+    --deploy    Bootstrap Kamal (generates Postgres password on first run)
+    --all       Run infra, pause for Spaces keys, then config + deploy
     -h, --help  Show this help
 
 Examples:
-    $(basename "$0")                # all steps
     $(basename "$0") --infra
     $(basename "$0") --config
+    $(basename "$0") --deploy
 EOF
 }
 
 check_dependencies() {
   local missing=()
-  command -v op              &>/dev/null || missing+=("op (1Password CLI)")
-  command -v tofu            &>/dev/null || missing+=("tofu (OpenTofu)")
+  command -v op               &>/dev/null || missing+=("op (1Password CLI)")
+  command -v tofu             &>/dev/null || missing+=("tofu (OpenTofu)")
   command -v ansible-playbook &>/dev/null || missing+=("ansible")
-  command -v kamal           &>/dev/null || missing+=("kamal")
+  command -v kamal            &>/dev/null || missing+=("kamal")
+  command -v openssl          &>/dev/null || missing+=("openssl")
   [[ ${#missing[@]} -gt 0 ]] && {
     log_error "Missing dependencies:"; printf '  - %s\n' "${missing[@]}"; exit 1
   }
@@ -54,42 +75,70 @@ require_var() {
   [[ -n "${!name:-}" ]] || { log_error "$name is not set (see infra/README.md)"; exit 1; }
 }
 
-# Pull every secret from 1Password. Mirrors .kamal/secrets so Kamal and
-# OpenTofu/Ansible share one source of truth. Requires OP_ACCOUNT.
-load_secrets_from_1password() {
-  log_info "Loading secrets from 1Password..."
-  : "${OP_ACCOUNT:?OP_ACCOUNT is not set (use HOPQBD5OXZDG7M6WBMJPF6RKRI for david@paluy.org)}"
+# Read a secret from 1Password; return empty string if the item/field is absent
+# rather than failing, so callers can detect "not yet created".
+op_read_or_empty() {
+  op read "$1" --account "$OP_ACCOUNT" 2>/dev/null || true
+}
 
-  op() { command op "$@"; }   # allow override in tests
+# --- Per-step secret loaders -----------------------------------------------
 
+load_infra_secrets() {
+  log_info "Loading infra secrets from 1Password..."
   export TF_VAR_do_token
-  TF_VAR_do_token=$(op read "op://reviewlens/digitalocean/credential" --account "$OP_ACCOUNT")
+  TF_VAR_DO_TOKEN=$(op_read_or_empty "$DO_REF")
+  [[ -n "$TF_VAR_DO_TOKEN" ]] || { log_error "DO token missing at $DO_REF"; exit 1; }
 
-  export TF_VAR_spaces_access_key_id
-  TF_VAR_spaces_access_key_id=$(op read "op://reviewlens/digitalocean-spaces/access_key_id" --account "$OP_ACCOUNT")
-  export TF_VAR_spaces_secret_access_key
-  TF_VAR_spaces_secret_access_key=$(op read "op://reviewlens/digitalocean-spaces/secret_access_key" --account "$OP_ACCOUNT")
-
-  export DIGITALOCEAN_API_TOKEN="$TF_VAR_do_token"
-  export POSTGRES_PASSWORD
-  POSTGRES_PASSWORD=$(op read "op://reviewlens/production-postgres/password" --account "$OP_ACCOUNT")
-  export OPENAI_API_KEY
-  OPENAI_API_KEY=$(op read "op://reviewlens/openai/api_key" --account "$OP_ACCOUNT")
-
-  # SSH public key lives on disk; point OP_SSH_PUBKEY at an op:// ref if you
-  # store it in 1Password instead.
   export TF_VAR_ssh_public_key
   TF_VAR_ssh_public_key="${SSH_PUBLIC_KEY:-$(cat "${SSH_PUBKEY_PATH:-$HOME/.ssh/id_ed25519.pub}")}"
 
-  # Admin SSH allowlist. MUST be a real operator CIDR; 0.0.0.0/0 is rejected.
-  : "${ADMIN_IP:?ADMIN_IP is not set (CIDR, e.g. 203.0.113.5/32)}"
+  : "${ADMIN_IP:?ADMIN_IP is not set (CIDR, e.g. 203.0.113.5/32; never 0.0.0.0/0)}"
   export TF_VAR_admin_ip="$ADMIN_IP"
-
-  log_info "Secrets loaded successfully"
+  export TF_VAR_do_token="$TF_VAR_DO_TOKEN"
+  export DIGITALOCEAN_API_TOKEN="$TF_VAR_DO_TOKEN"
+  export TF_VAR_spaces_region="${SPACES_REGION:-nyc3}"
+  export TF_VAR_project_name="reviewlens"
+  export TF_VAR_droplet_region="${DROPLET_REGION:-nyc3}"
+  export TF_VAR_droplet_size="${DROPLET_SIZE:-s-2vcpu-4gb}"
 }
+
+load_config_secrets() {
+  log_info "Loading config secrets from 1Password..."
+  SPACES_AK=$(op_read_or_empty "$SPACES_AK_REF")
+  SPACES_SK=$(op_read_or_empty "$SPACES_SK_REF")
+  [[ -n "$SPACES_AK" && -n "$SPACES_SK" ]] || {
+    log_error "Spaces keys missing. After --infra, generate them in the DO console"
+    log_error "and store to 1Password:"
+    log_error "  $SPACES_AK_REF"
+    log_error "  $SPACES_SK_REF"
+    exit 1
+  }
+  export TF_VAR_spaces_access_key_id="$SPACES_AK"
+  export TF_VAR_spaces_secret_access_key="$SPACES_SK"
+  ensure_postgres_password
+}
+
+# Ensure a Postgres password exists in 1Password. On first run it is generated,
+# stored, and exported. Kamal's Postgres accessory reads this env var on first
+# boot to set the role password, so it must be stable across deploys.
+ensure_postgres_password() {
+  export POSTGRES_PASSWORD
+  POSTGRES_PASSWORD=$(op_read_or_empty "$PG_PW_REF")
+  if [[ -z "$POSTGRES_PASSWORD" ]]; then
+    log_warn "No Postgres password in 1Password. Generating and storing it..."
+    POSTGRES_PASSWORD=$(openssl rand -hex 24)
+    op item create --category password --vault reviewlens \
+      --title "production-postgres" \
+      password="$POSTGRES_PASSWORD" --account "$OP_ACCOUNT" >/dev/null
+    log_info "Stored at $PG_PW_REF"
+  fi
+}
+
+# --- Steps -----------------------------------------------------------------
 
 run_infra() {
   log_info "Provisioning infrastructure with OpenTofu..."
+  load_infra_secrets
   cd "$INFRA_DIR"
   [[ -f .terraform.lock.hcl ]] || tofu init
   tofu plan -out=tfplan
@@ -99,6 +148,16 @@ run_infra() {
   else
     log_warn "Skipped apply"; rm -f tfplan
   fi
+  cat <<EOF
+
+${YELLOW}[NEXT]${NC} Generate DO Spaces keys for the backup bucket:
+  DO console -> Settings -> Spaces Keys -> Create. Grant read/write on
+  the reviewlens-backups bucket, then store to 1Password:
+    $SPACES_AK_REF
+    $SPACES_SK_REF
+  Then run: $(basename "$0") --config
+
+EOF
 }
 
 server_ip() {
@@ -107,13 +166,10 @@ server_ip() {
 
 run_config() {
   log_info "Configuring Droplet with Ansible..."
+  load_config_secrets
   cd "$INFRA_DIR"
   local ip; ip="$(server_ip)"
   [[ -n "$ip" ]] || read -rp "Enter server IP: " ip
-
-  require_var TF_VAR_spaces_access_key_id
-  require_var TF_VAR_spaces_secret_access_key
-  require_var POSTGRES_PASSWORD
 
   ansible-galaxy install -r ansible/requirements.yml
   ansible-playbook -i "$ip," --user root ansible/playbook.yml \
@@ -126,6 +182,7 @@ run_config() {
 
 run_deploy() {
   log_info "Bootstrapping Kamal..."
+  ensure_postgres_password
   cd "$PROJECT_ROOT"
   local ip; ip="$(server_ip)"
   if [[ -n "$ip" ]]; then
@@ -136,28 +193,27 @@ run_deploy() {
   fi
   require_var DEPLOY_DOMAIN
   require_var DIGITALOCEAN_API_TOKEN
-  require_var POSTGRES_PASSWORD
-  require_var OPENAI_API_KEY
-  # .kamal/secrets resolves the rest (master key, DB URLs) from 1Password.
+  # .kamal/secrets resolves production.key + DO token + DB URLs from 1Password.
   kamal setup
   log_info "Done. Future deploys: kamal deploy"
 }
 
 main() {
-  local run_all=true do_infra=false do_config=false do_deploy=false
+  local run_all=false do_infra=false do_config=false do_deploy=false
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --infra)  do_infra=true;  run_all=false ;;
-      --config) do_config=true; run_all=false ;;
-      --deploy) do_deploy=true; run_all=false ;;
+      --infra)  do_infra=true ;;
+      --config) do_config=true ;;
+      --deploy) do_deploy=true ;;
       --all)    run_all=true ;;
       -h|--help) usage; exit 0 ;;
       *) log_error "Unknown option: $1"; usage; exit 1 ;;
     esac; shift
   done
   $run_all && { do_infra=true; do_config=true; do_deploy=true; }
+  [[ $do_infra == false && $do_config == false && $do_deploy == false ]] && usage && exit 0
+
   check_dependencies
-  load_secrets_from_1password
   $do_infra  && run_infra
   $do_config && run_config
   $do_deploy && run_deploy
