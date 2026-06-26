@@ -63,3 +63,7 @@
 
 # Ignore local scrape-probe output and captured fixtures not meant for the repo.
 /script/output/
+
+# Ignore key files for decrypting credentials and more.
+/config/*.key
+
