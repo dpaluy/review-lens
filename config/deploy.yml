@@ -2,8 +2,6 @@
 # See DEPLOY.md for provisioning and first-run instructions.
 #
 # Operator-provided values (set in your shell or CI before `kamal deploy`):
-#   DEPLOY_HOST            - public IP of the DigitalOcean Droplet
-#   DEPLOY_DOMAIN          - domain pointing at DEPLOY_HOST (A record)
 #   DIGITALOCEAN_API_TOKEN - DO API token (also authenticates the registry)
 #   POSTGRES_PASSWORD      - database password for the review_lens role
 #   DB_HOST                - Postgres host (defaults to the on-droplet accessory)
@@ -22,17 +20,17 @@ image: reviewlens/review_lens
 servers:
   web:
     hosts:
-      - <%= ENV.fetch("DEPLOY_HOST") %>
+      - app.cairnfoundry.com
   job:
     hosts:
-      - <%= ENV.fetch("DEPLOY_HOST") %>
+      - app.cairnfoundry.com
     cmd: bin/jobs
 
 # kamal-proxy terminates SSL via Let's Encrypt and does zero-downtime rolling
 # restarts. Requires config.assume_ssl + config.force_ssl in production.rb.
 proxy:
   ssl: true
-  host: <%= ENV.fetch("DEPLOY_DOMAIN") %>
+  host: app.cairnfoundry.com
   healthcheck:
     path: /up
     interval: 3
@@ -41,7 +39,8 @@ proxy:
 registry:
   server: registry.digitalocean.com
   # The DO API token authenticates to the registry.
-  username: <%= ENV.fetch("DIGITALOCEAN_API_TOKEN") %>
+  username:
+    - KAMAL_REGISTRY_USERNAME
   password:
     - KAMAL_REGISTRY_PASSWORD
 
@@ -64,7 +63,7 @@ env:
 accessories:
   db:
     image: postgres:16
-    host: <%= ENV.fetch("DEPLOY_HOST") %>
+    host: app.cairnfoundry.com
     # Bind only to localhost so Postgres is never exposed to the public internet.
     port: "127.0.0.1:5432:5432"
     env:

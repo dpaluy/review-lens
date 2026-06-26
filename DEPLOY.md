@@ -73,13 +73,15 @@ Only two items must exist up front; the rest are created during provisioning.
 OpenAI key is NOT a deploy secret. It lives in `config/credentials/production.yml.enc`
 and is read at runtime by the app.
 
-Then export the non-secret deployment values:
+Then export the deployment values used by the provisioner:
 
 ```bash
 export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI   # david@paluy.org
-export DEPLOY_DOMAIN=app.cairnfoundry.com
 export ADMIN_IP=203.0.113.5/32   # your IP in CIDR, for SSH firewall
 ```
+
+The Kamal target host and proxy domain are fixed in `config/deploy.yml` as
+`app.cairnfoundry.com`. Make sure its DNS A record points at the Droplet.
 
 Kamal reads the rest from 1Password when it sources `.kamal/secrets`. Keep a
 backup of `config/master.key` and the Postgres password somewhere safe; they
@@ -96,12 +98,13 @@ infra/bin/provision --config   # 3. harden droplet, install Docker, backup cron
 infra/bin/provision --deploy   # 4. generate PG password, kamal setup
 ```
 
-Or, for Kamal-only deploys after the droplet exists, source secrets first:
+Or, for Kamal-only deploys after the droplet exists, source the 1Password
+account first. Kamal reads the remaining secrets from `.kamal/secrets`, including
+`POSTGRES_PASSWORD` for the Postgres accessory and
+`REVIEW_LENS_DATABASE_PASSWORD` for Rails:
 
 ```bash
 export OP_ACCOUNT=HOPQBD5OXZDG7M6WBMJPF6RKRI
-export POSTGRES_PASSWORD=$(op read "op://reviewlens/production-postgres/password")
-export DEPLOY_HOST=<droplet-ip> DEPLOY_DOMAIN=app.cairnfoundry.com
 bin/kamal setup
 ```
 
