@@ -93,6 +93,8 @@ asset_path: /rails/public/assets
 # remote builder (see DEPLOY.md) for faster native builds if desired.
 builder:
   arch: amd64
+  provenance: false
+  sbom: false
 
 ssh:
   user: root

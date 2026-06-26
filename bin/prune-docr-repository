@@ -1,76 +1,248 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-REGISTRY_NAME="${DOCR_REGISTRY:-reviewlens}"
-REPOSITORY="${DOCR_REPOSITORY:-review_lens}"
-KEEP_MANIFESTS="${DOCR_KEEP_MANIFESTS:-5}"
-DRY_RUN="${DRY_RUN:-0}"
-SKIP_GC="${SKIP_GC:-0}"
+require "json"
+require "net/http"
+require "open3"
+require "time"
+require "uri"
 
-if ! command -v doctl >/dev/null 2>&1; then
-  echo "doctl is required. Install and authenticate it before pruning the registry." >&2
-  exit 1
-fi
+$stdout.sync = true
+$stderr.sync = true
 
-if ! [[ "$KEEP_MANIFESTS" =~ ^[0-9]+$ ]] || [ "$KEEP_MANIFESTS" -lt 1 ]; then
-  echo "DOCR_KEEP_MANIFESTS must be a positive integer." >&2
-  exit 1
-fi
+class DigitalOceanApiError < StandardError
+  attr_reader :status, :body
 
-doctl_cmd() {
-  if [ -n "${DIGITALOCEAN_API_TOKEN:-}" ]; then
-    doctl --access-token "$DIGITALOCEAN_API_TOKEN" "$@"
-  else
-    doctl "$@"
-  fi
-}
+  def initialize(status, body)
+    @status = status
+    @body = body
+    super("DigitalOcean API returned #{status}: #{body}")
+  end
+end
 
-manifest_file="$(mktemp)"
-delete_file="$(mktemp)"
-trap 'rm -f "$manifest_file" "$delete_file"' EXIT
+REGISTRY_NAME = ENV.fetch("DOCR_REGISTRY", "reviewlens")
+REPOSITORY = ENV.fetch("DOCR_REPOSITORY", "review_lens")
+KEEP_MANIFESTS = Integer(ENV.fetch("DOCR_KEEP_MANIFESTS", "1"), 10)
+DRY_RUN = ENV.fetch("DRY_RUN", "0") == "1"
+SKIP_GC = ENV.fetch("SKIP_GC", "0") == "1"
+WAIT_GC = ENV.fetch("DOCR_WAIT_GC", "1") == "1"
+FORCE_GC = ENV.fetch("FORCE_GC", "0") == "1"
+GC_WAIT_SECONDS = Integer(ENV.fetch("DOCR_GC_WAIT_SECONDS", "1200"), 10)
+GC_POLL_SECONDS = Integer(ENV.fetch("DOCR_GC_POLL_SECONDS", "10"), 10)
+DO_TOKEN_REF = ENV.fetch("DO_TOKEN_REF", "op://reviewlens/digitalocean/credential")
+OP_ACCOUNT = ENV.fetch("OP_ACCOUNT", "HOPQBD5OXZDG7M6WBMJPF6RKRI")
+API_BASE = "https://api.digitalocean.com"
 
-doctl_cmd registry repository list-manifests "$REPOSITORY" \
-  --registry "$REGISTRY_NAME" \
-  --format Digest,UpdatedAt \
-  --no-header |
-  awk '$1 ~ /^sha256:/ { print $1, $2 }' |
-  sort -k2,2r > "$manifest_file"
+abort "DOCR_KEEP_MANIFESTS must be non-negative." if KEEP_MANIFESTS.negative?
+abort "DOCR_GC_WAIT_SECONDS must be non-negative." if GC_WAIT_SECONDS.negative?
+abort "DOCR_GC_POLL_SECONDS must be non-negative." if GC_POLL_SECONDS.negative?
 
-manifest_count="$(wc -l < "$manifest_file" | tr -d ' ')"
-if [ "$manifest_count" -eq 0 ]; then
-  echo "No manifests found for registry=$REGISTRY_NAME repository=$REPOSITORY."
-  exit 0
-fi
+def present?(value)
+  !value.to_s.strip.empty?
+end
 
-echo "Found $manifest_count manifests in registry=$REGISTRY_NAME repository=$REPOSITORY."
-echo "Keeping the newest $KEEP_MANIFESTS manifests. Override with DOCR_KEEP_MANIFESTS=N."
+def op_available?
+  system("command -v op >/dev/null 2>&1")
+end
 
-tail -n +"$((KEEP_MANIFESTS + 1))" "$manifest_file" > "$delete_file"
+def read_token_from_op
+  return unless op_available?
 
-delete_count="$(wc -l < "$delete_file" | tr -d ' ')"
-if [ "$delete_count" -eq 0 ]; then
-  echo "Nothing to delete."
+  output, status = Open3.capture2e("op", "read", DO_TOKEN_REF, "--account", OP_ACCOUNT)
+  return output.strip if status.success? && present?(output)
+
+  nil
+end
+
+def digitalocean_token
+  ENV["DIGITALOCEAN_API_TOKEN"].to_s.strip.then { |token| return token if present?(token) }
+  ENV["KAMAL_REGISTRY_PASSWORD"].to_s.strip.then { |token| return token if present?(token) }
+  read_token_from_op
+end
+
+TOKEN = digitalocean_token
+abort "DIGITALOCEAN_API_TOKEN is required, or OP_ACCOUNT must allow reading #{DO_TOKEN_REF}." unless present?(TOKEN)
+
+def encoded(value)
+  URI.encode_www_form_component(value)
+end
+
+def request(method, path, body: nil, success: [ 200 ])
+  uri = URI("#{API_BASE}#{path}")
+  request_class = Net::HTTP.const_get(method.to_s.capitalize)
+  http_request = request_class.new(uri)
+  http_request["Authorization"] = "Bearer #{TOKEN}"
+  http_request["Content-Type"] = "application/json"
+  http_request.body = JSON.generate(body) if body
+
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true, open_timeout: 10, read_timeout: 60) do |http|
+    http.request(http_request)
+  end
+
+  return response if success.include?(response.code.to_i)
+
+  raise DigitalOceanApiError.new(response.code.to_i, response.body.to_s)
+end
+
+def list_manifests
+  manifests = []
+  page = 1
+
+  loop do
+    response = request(
+      :get,
+      "/v2/registries/#{encoded(REGISTRY_NAME)}/repositories/#{encoded(REPOSITORY)}/digests?per_page=200&page=#{page}"
+    )
+    payload = JSON.parse(response.body)
+    page_manifests = Array(payload["manifests"])
+    manifests.concat(page_manifests)
+
+    break if page_manifests.empty? || !payload.dig("links", "pages", "next")
+
+    page += 1
+  end
+
+  manifests.sort_by { |manifest| Time.parse(manifest.fetch("updated_at", "1970-01-01T00:00:00Z")) }.reverse
+end
+
+def delete_manifest(digest)
+  request(
+    :delete,
+    "/v2/registries/#{encoded(REGISTRY_NAME)}/repositories/#{encoded(REPOSITORY)}/digests/#{encoded(digest)}",
+    success: [ 204, 404 ]
+  )
+end
+
+def delete_manifests(manifests)
+  pending = manifests.sort_by { |manifest| Array(manifest["tags"]).any? ? 0 : 1 }
+
+  3.times do |attempt|
+    referenced = []
+
+    pending.each do |manifest|
+      digest = manifest.fetch("digest")
+      updated_at = manifest.fetch("updated_at", "unknown")
+      tags = Array(manifest["tags"]).join(",")
+
+      begin
+        puts "Deleting manifest #{digest} tags=#{tags} updated_at=#{updated_at}"
+        delete_manifest(digest)
+      rescue DigitalOceanApiError => error
+        raise unless error.status == 412
+
+        referenced << manifest
+      end
+    end
+
+    return if referenced.empty?
+
+    if referenced.size == pending.size
+      referenced.each do |manifest|
+        puts "Keeping referenced manifest #{manifest.fetch("digest")} tags=#{Array(manifest["tags"]).join(",")}."
+      end
+      return
+    end
+
+    puts "Retrying #{referenced.size} referenced manifests after parent manifest deletions." if attempt < 2
+    pending = referenced
+  end
+end
+
+def active_gc
+  response = request(
+    :get,
+    "/v2/registries/#{encoded(REGISTRY_NAME)}/garbage-collection",
+    success: [ 200, 404 ]
+  )
+  return if response.code.to_i == 404
+
+  garbage_collection = JSON.parse(response.body)["garbage_collection"]
+  return if garbage_collection.nil? || garbage_collection.empty?
+
+  garbage_collection
+end
+
+def wait_for_gc
+  return unless WAIT_GC
+
+  started_at = Time.now
+
+  loop do
+    garbage_collection = active_gc
+    status = garbage_collection&.fetch("status", nil)
+    break if status.nil? || %w[success failed canceled].include?(status)
+
+    elapsed = Time.now - started_at
+    if elapsed > GC_WAIT_SECONDS
+      abort "Timed out waiting for DigitalOcean registry garbage collection after #{GC_WAIT_SECONDS}s."
+    end
+
+    puts "Waiting for DigitalOcean registry garbage collection, status=#{status}..."
+    sleep GC_POLL_SECONDS
+  end
+end
+
+def start_gc
+  return if SKIP_GC
+
+  puts "Starting DigitalOcean registry garbage collection with untagged manifests included."
+  request(
+    :post,
+    "/v2/registries/#{encoded(REGISTRY_NAME)}/garbage-collection",
+    body: { type: "untagged manifests and unreferenced blobs" },
+    success: [ 200, 201, 202 ]
+  )
+rescue DigitalOceanApiError => error
+  raise unless error.status == 409 || error.body.match?(/active|already|running|progress/i)
+
+  puts "DigitalOcean registry garbage collection is already active."
+ensure
+  wait_for_gc
+end
+
+if (garbage_collection = active_gc)
+  puts "DigitalOcean registry garbage collection already active, status=#{garbage_collection.fetch("status", "unknown")}."
+  wait_for_gc
+end
+
+manifests = list_manifests
+puts "Found #{manifests.size} manifests in registry=#{REGISTRY_NAME} repository=#{REPOSITORY}."
+puts "Keeping the newest #{KEEP_MANIFESTS} tagged manifests. Override with DOCR_KEEP_MANIFESTS=N."
+
+protected_manifests = if KEEP_MANIFESTS.zero?
+  []
 else
-  while read -r digest updated_at; do
-    [ -n "$digest" ] || continue
+  tagged_manifests = manifests.select { |manifest| Array(manifest["tags"]).any? }
+  protected = tagged_manifests.first(KEEP_MANIFESTS)
+  protected.empty? ? manifests.first(KEEP_MANIFESTS) : protected
+end
 
-    if [ "$DRY_RUN" = "1" ]; then
-      echo "Would delete manifest $digest updated_at=$updated_at"
-    else
-      echo "Deleting manifest $digest updated_at=$updated_at"
-      doctl_cmd registry repository delete-manifest "$REPOSITORY" "$digest" \
-        --registry "$REGISTRY_NAME" \
-        --force
-    fi
-  done < "$delete_file"
-fi
+protected_digests = protected_manifests.map { |manifest| manifest.fetch("digest") }
+protected_manifests.each do |manifest|
+  puts "Keeping manifest #{manifest.fetch("digest")} tags=#{Array(manifest["tags"]).join(",")} updated_at=#{manifest.fetch("updated_at", "unknown")}"
+end
 
-if [ "$DRY_RUN" = "1" ] || [ "$SKIP_GC" = "1" ]; then
-  echo "Skipping garbage collection."
-  exit 0
-fi
+manifests_to_delete = manifests.reject { |manifest| protected_digests.include?(manifest.fetch("digest")) }
+deleted_manifests = false
 
-echo "Starting DigitalOcean registry garbage collection with untagged manifests included."
-doctl_cmd registry garbage-collection start "$REGISTRY_NAME" \
-  --include-untagged-manifests \
-  --force
+if manifests_to_delete.empty?
+  puts "No old manifests to delete."
+elsif DRY_RUN
+  manifests_to_delete.each do |manifest|
+    digest = manifest.fetch("digest")
+    updated_at = manifest.fetch("updated_at", "unknown")
+    tags = Array(manifest["tags"]).join(",")
+    puts "Would delete manifest #{digest} tags=#{tags} updated_at=#{updated_at}"
+  end
+else
+  delete_manifests(manifests_to_delete)
+  deleted_manifests = true
+end
+
+if DRY_RUN
+  puts "Skipping garbage collection in dry run."
+elsif deleted_manifests || FORCE_GC
+  start_gc
+else
+  puts "Skipping garbage collection because no manifests were deleted. Use FORCE_GC=1 to run it anyway."
+end
