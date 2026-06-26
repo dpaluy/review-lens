@@ -23,7 +23,7 @@ class Ingestion::SummaryBuilderTest < ActiveSupport::TestCase
     product.reload
     assert_equal 4, product.reviews_count
     assert_equal 3.0, product.average_rating.to_f
-    assert_equal({ "2.0" => 1, "3.0" => 1, "4.0" => 1 }, product.rating_distribution)
+    assert_equal({ "2" => 1, "3" => 1, "4" => 1 }, product.rating_distribution)
     assert_equal({ "negative" => 1, "neutral" => 1, "positive" => 1, "unknown" => 1 }, product.sentiment_distribution)
     assert_equal Time.zone.parse("2026-05-01T12:00:00Z"), product.oldest_review_at
     assert_equal Time.zone.parse("2026-06-01T12:00:00Z"), product.newest_review_at

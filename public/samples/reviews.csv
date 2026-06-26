@@ -1,21 +1,41 @@
 title,body,rating,reviewer,date,reviewer_role,company_size,external_review_id
-Fast onboarding,"The onboarding checklist was clear and our team imported the first workspace in less than a day.",5,Avery,2026-01-03,Operations Lead,51-200,sample-001
-Confusing billing,"The invoice language was confusing and it took three emails to understand which add-ons we were paying for.",2,Jordan,2026-01-04,Finance Manager,51-200,sample-002
-Reliable automations,"Automations have been reliable for recurring approvals and saved our account managers several hours each week.",5,Morgan,2026-01-05,Customer Success Manager,201-500,sample-003
-Weak reporting filters,"The reporting page needs better filters because regional managers still export CSVs for basic breakdowns.",3,Casey,2026-01-06,Revenue Operations,201-500,sample-004
-Helpful support,"Support answered a permissions question in under an hour and included screenshots we could forward internally.",5,Riley,2026-01-07,IT Manager,51-200,sample-005
-Slow bulk edits,"Bulk editing large customer lists feels slow and sometimes leaves users unsure whether changes were saved.",2,Taylor,2026-01-08,Sales Ops Analyst,51-200,sample-006
-Good admin controls,"Role permissions are flexible enough for our managers without giving everyone full admin access.",4,Quinn,2026-01-09,Systems Administrator,201-500,sample-007
-Needs better onboarding emails,"The product is useful, but the onboarding emails assume too much prior knowledge for new analysts.",3,Jamie,2026-01-10,Analytics Manager,11-50,sample-008
-Clean integration setup,"Connecting the CRM integration was straightforward and the field mapping screen caught several mistakes before sync.",5,Drew,2026-01-11,CRM Administrator,51-200,sample-009
-Mobile view is limited,"Managers like the desktop dashboard, but the mobile view hides too many details for quick approvals.",3,Emerson,2026-01-12,Regional Manager,201-500,sample-010
-Search works well,"Search finds old customer notes quickly and has reduced duplicate requests to our support team.",4,Rowan,2026-01-13,Support Lead,51-200,sample-011
-Export formatting issue,"Exports include the right data, but the formatting changes between downloads and creates cleanup work.",2,Reese,2026-01-14,Business Analyst,51-200,sample-012
-Strong audit trail,"The audit trail is easy to follow and helped our compliance team answer questions during review.",5,Finley,2026-01-15,Compliance Manager,201-500,sample-013
-Feature request for templates,"We need reusable workflow templates so each department does not rebuild the same approval process.",4,Parker,2026-01-16,Operations Director,201-500,sample-014
-Notification noise,"Notifications are useful but too noisy by default, especially for users copied on multiple workflows.",3,Hayden,2026-01-17,Program Manager,51-200,sample-015
-Positive team adoption,"Most of our team adopted it quickly because the main task queue is simple and easy to scan.",5,Skyler,2026-01-18,Team Lead,51-200,sample-016
-SAML setup friction,"SAML eventually worked, but the setup documentation skipped a few identity-provider details.",3,Kendall,2026-01-19,IT Director,201-500,sample-017
-Clear customer timeline,"The customer timeline gives account managers the full context before renewal calls.",4,Harper,2026-01-20,Account Manager,51-200,sample-018
-Needs faster dashboard loading,"Dashboards with several months of data can take long enough that managers stop using them live.",2,Blake,2026-01-21,Operations Manager,201-500,sample-019
-Useful saved views,"Saved views are a small feature but make weekly pipeline reviews much easier to repeat.",4,Logan,2026-01-22,Sales Manager,51-200,sample-020
+Fast onboarding,The onboarding checklist was clear and our team imported the first workspace in less than a day.,5,Avery,2026-01-03,Operations Lead,,sample-001
+Confusing billing,The invoice language was confusing and it took three emails to understand which add-ons we were paying for.,2,Jordan,2026-01-04,,51-200,sample-002
+Reliable automations,Automations have been reliable for recurring approvals and saved our account managers several hours each week.,5,Morgan,2026-01-05,Customer Success Manager,,sample-003
+Weak reporting filters,The reporting page needs better filters because regional managers still export CSVs for basic breakdowns.,3,Casey,2026-01-06,,201-500,sample-004
+Helpful support,Support answered a permissions question in under an hour and included screenshots we could forward internally.,5,Riley,2026-01-07,IT Manager,,sample-005
+Slow bulk edits,Bulk editing large customer lists feels slow and sometimes leaves users unsure whether changes were saved.,2,Taylor,2026-01-08,,51-200,sample-006
+Good admin controls,Role permissions are flexible enough for our managers without giving everyone full admin access.,4,Quinn,,Systems Administrator,201-500,sample-007
+Needs better onboarding emails,"The product is useful, but the onboarding emails assume too much prior knowledge for new analysts.",3,Jamie,2026-01-10,Analytics Manager,,sample-008
+Clean integration setup,Connecting the CRM integration was straightforward and the field mapping screen caught several mistakes before sync.,5,Drew,2026-01-11,,51-200,sample-009
+Mobile view is limited,"Managers like the desktop dashboard, but the mobile view hides too many details for quick approvals.",3,Emerson,2026-01-12,Regional Manager,,sample-010
+Search works well,Search finds old customer notes quickly and has reduced duplicate requests to our support team.,4,Rowan,,Support Lead,51-200,sample-011
+Export formatting issue,"Exports include the right data, but the formatting changes between downloads and creates cleanup work.",2,Reese,2026-01-14,Business Analyst,,sample-012
+Strong audit trail,The audit trail is easy to follow and helped our compliance team answer questions during review.,5,Finley,2026-01-15,,201-500,sample-013
+Feature request for templates,We need reusable workflow templates so each department does not rebuild the same approval process.,4,Parker,2026-01-16,Operations Director,,sample-014
+Notification noise,"Notifications are useful but too noisy by default, especially for users copied on multiple workflows.",3,Hayden,2026-01-17,Program Manager,,sample-015
+Positive team adoption,Most of our team adopted it quickly because the main task queue is simple and easy to scan.,5,Skyler,2026-01-18,Team Lead,51-200,sample-016
+SAML setup friction,"SAML eventually worked, but the setup documentation skipped a few identity-provider details.",3,Kendall,2026-01-19,,201-500,sample-017
+Clear customer timeline,The customer timeline gives account managers the full context before renewal calls.,4,Harper,,Account Manager,51-200,sample-018
+Needs faster dashboard loading,Dashboards with several months of data can take long enough that managers stop using them live.,2,Blake,2026-01-21,Operations Manager,,sample-019
+Useful saved views,Saved views are a small feature but make weekly pipeline reviews much easier to repeat.,4,Logan,,Sales Manager,51-200,sample-020
+Mixed experience,"Some features are great, others feel half-baked; overall it gets the job done but with rough edges.",3,Sasha,2026-01-23,,51-200,sample-021
+Slow initial load,The first page load after login takes too long and our sales reps frequently refresh twice before the dashboard appears.,1,Devon,2026-01-24,Sales Rep,,sample-022
+Decent reporting once configured,"Once our analyst tuned the report filters the data is reliable, but the initial setup took a full week.",4,Maya,2026-01-25,Analytics Manager,11-50,sample-023
+Great for small teams,"For a 15-person team it covers approvals, notes, and timelines without extra tools.",5,Robin,2026-02-01,,11-50,sample-024
+API rate limits,We hit API rate limits during nightly syncs and had to batch jobs manually; docs were unclear on the limits.,2,Ari,2026-02-02,Backend Developer,201-500,sample-025
+Helpful onboarding specialist,Our onboarding specialist answered every question within a day and shared templates we still use.,5,Lennon,2026-02-03,Customer Success Manager,,sample-026
+Clunky mobile approvals,Approving requests from mobile is unreliable and occasionally marks items read before I open them.,2,Remy,,,201-500,sample-027
+Strong permission model,Granular roles let us give regional managers visibility without exposing finance fields.,5,Ellis,2026-02-04,Security Admin,201-500,sample-028
+Average overall,It does what we need but nothing stands out; support is okay and performance is acceptable.,3,Quinn,,Operations Lead,51-200,sample-029
+Pricey for what it is,For our size the pricing feels steep relative to the modules we actually use day to day.,2,Tatum,2026-02-06,Finance Director,,sample-030
+Love the timeline view,The customer timeline replaced two internal spreadsheets and made renewal reviews much faster.,5,Marlowe,2026-02-07,,11-50,sample-031
+Duplicate notifications,We received duplicate notifications for the same approval which caused confusion across two teams.,1,,2026-02-08,Program Manager,,sample-032
+Reliable sync,The CRM sync has run without intervention for three months and caught several duplicate contacts automatically.,5,River,,CRM Administrator,201-500,sample-033
+Documentation gaps,Several advanced workflows were only explained in community posts and the official docs lagged behind.,3,Sage,2026-02-10,,11-50,sample-034
+Solid for approvals,Approval routing is flexible and we configured multi-step chains without engineering help.,4,Wren,2026-02-11,Operations Director,,sample-035
+Needs bulk import,We still cannot bulk-import historical customer notes and had to write a one-off migration script.,2,Kai,2026-02-12,,51-200,sample-036
+Smooth renewal,The renewal process was transparent and our account manager outlined every change before we signed.,5,Indigo,2026-02-13,Procurement Lead,,sample-037
+Decent but slow on large datasets,Working with 100k+ rows noticeably slows the dashboard and some filters time out.,3,,2026-02-14,,201-500,sample-038
+Great support turnaround,Support escalated a permissions bug to engineering and shipped a fix within two business days.,5,Jules,2026-02-15,IT Manager,51-200,sample-039
+Useful but buggy import,The CSV import is handy when it works but occasionally fails silently on rows with special characters.,3,Cleo,2026-02-16,Operations Lead,,sample-040
