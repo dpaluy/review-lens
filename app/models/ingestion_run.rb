@@ -1,7 +1,7 @@
 class IngestionRun < ApplicationRecord
-  belongs_to :product
+  WARNING_MESSAGE_KEYS = %w[message detail title code].freeze
 
-  WARNING_MESSAGE_KEYS = %w[ message detail title code ].freeze
+  belongs_to :product
 
   enum :status, {
     pending: "pending",
@@ -12,14 +12,18 @@ class IngestionRun < ApplicationRecord
     failed: "failed"
   }
 
-  def warning_messages
-    Array(warnings).filter_map do |warning|
-      case warning
-      when String
-        warning.presence
-      when Hash
-        WARNING_MESSAGE_KEYS.filter_map { |key| warning[key].presence || warning[key.to_sym].presence }.first
-      end
+  def self.warning_message_for(warning)
+    case warning
+    when String
+      warning.presence
+    when Hash
+      WARNING_MESSAGE_KEYS.filter_map do |key|
+        warning[key].presence || warning[key.to_sym].presence
+      end.first
     end
+  end
+
+  def warning_messages
+    Array(warnings).filter_map { |warning| self.class.warning_message_for(warning) }
   end
 end

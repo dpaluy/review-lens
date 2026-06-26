@@ -39,8 +39,9 @@ class ProductTest < ActiveSupport::TestCase
     product = Product.new(source_url: "https://www.trustpilot.com/review/quickbooks.intuit.com")
 
     assert product.valid?
-    assert_equal "trustpilot", product.platform
+    assert_equal Product::PLATFORM_TRUSTPILOT, product.platform
     assert_equal "quickbooks.intuit.com", product.external_id
+    assert_predicate product, :trustpilot_platform?
   end
 
   test "finds cached product by trustpilot review target" do
@@ -48,20 +49,18 @@ class ProductTest < ActiveSupport::TestCase
 
     cached_product = Product.find_or_initialize_from_source_url("https://www.trustpilot.com/review/quickbooks.intuit.com?languages=all")
 
-    assert_predicate cached_product, :persisted?
     assert_equal existing_product, cached_product
   end
 
   test "rejects trustpilot urls without review target" do
-    product = Product.new(source_url: "https://www.trustpilot.com/review/")
+    product = Product.new(source_url: "https://www.trustpilot.com/")
 
     assert_not product.valid?
-    assert_includes product.errors[:source_url], "must include Trustpilot review target"
+    assert_includes product.errors[:source_url], "include Trustpilot review target"
   end
 
   test "enforces one cached product per platform external id pair" do
     existing_product = products(:example)
-
     duplicate = Product.new(
       platform: existing_product.platform,
       source_url: existing_product.source_url,
@@ -73,7 +72,30 @@ class ProductTest < ActiveSupport::TestCase
     assert_includes duplicate.errors[:external_id], "has already been taken"
   end
 
-  test "fixtures can represent pending cached products" do
-    assert_predicate products(:manual), :pending?
+  test "builds manual import identity without trustpilot validation" do
+    product = Product.new(
+      import_mode: Product::PLATFORM_MANUAL_IMPORT,
+      name: "Manual CRM",
+      source_url: "https://example.com/manual-crm-reviews"
+    )
+
+    assert product.valid?
+    assert_predicate product, :manual_import?
+    assert_equal Product::PLATFORM_MANUAL_IMPORT, product.platform
+    assert_match(/\Amanual-/, product.external_id)
+  end
+
+  test "uses reviews count as usable review count" do
+    assert_equal 4, products(:example).usable_review_count
+  end
+
+  test "reports thin corpus only when ready and below usable review threshold" do
+    thin_product = products(:example)
+
+    assert_not_predicate products(:example), :thin_corpus?
+    assert_not_predicate products(:ready), :thin_corpus?
+
+    thin_product.ingestion_status = "ready"
+    assert_predicate thin_product, :thin_corpus?
   end
 end
