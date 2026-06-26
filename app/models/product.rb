@@ -13,6 +13,7 @@ class Product < ApplicationRecord
 
   has_many :ingestion_runs, dependent: :destroy
   has_many :reviews, dependent: :destroy
+  has_many :conversations, dependent: :nullify
 
   enum :ingestion_status, {
     pending: "pending",

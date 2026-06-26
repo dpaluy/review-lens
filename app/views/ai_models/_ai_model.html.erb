@@ -1,0 +1,17 @@
+<% model_id = ai_model.respond_to?(:model_id) ? ai_model.model_id : ai_model.id %>
+<% row_id = [ai_model.provider, model_id].join("_").parameterize(separator: "_") %>
+<tr id="model_<%= row_id %>">
+  <td class="px-3 py-2 text-sm text-gray-700"><%= ai_model.provider_class&.name || ai_model.provider %></td>
+  <td class="px-3 py-2 text-sm text-gray-900"><%= ai_model.respond_to?(:display_name) ? ai_model.display_name : ai_model.name %></td>
+  <td class="px-3 py-2 text-sm text-gray-700"><%= number_with_delimiter(ai_model.context_window) if ai_model.context_window %></td>
+  <td class="px-3 py-2 text-sm text-gray-700">
+    <% input = ai_model.input_price_per_million %>
+    <% output = ai_model.output_price_per_million %>
+    <% if input && output %>
+      $<%= "%.2f" % input %> / $<%= "%.2f" % output %>
+    <% end %>
+  </td>
+  <td class="px-3 py-2 text-sm">
+    <%= link_to "Start conversation", new_conversation_path(model: model_id), class: "text-blue-600 hover:text-blue-500" %>
+  </td>
+</tr>
