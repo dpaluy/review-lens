@@ -1,0 +1,840 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>ReviewLens AI High Level Architecture</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f6f3ec;
+        --paper: #fffdfa;
+        --ink: #17201d;
+        --muted: #59645f;
+        --line: #cfc8ba;
+        --strong-line: #8e8271;
+        --green: #1f6b4e;
+        --green-soft: #d9eadf;
+        --blue: #295f8f;
+        --blue-soft: #dce9f5;
+        --red: #9c3b36;
+        --red-soft: #f1dfdc;
+        --gold: #8b651f;
+        --gold-soft: #efe2c5;
+        --charcoal: #27302c;
+        --shadow: 0 18px 45px rgba(39, 48, 44, 0.12);
+        --radius: 8px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+        scroll-padding-top: 80px;
+      }
+
+      body {
+        margin: 0;
+        background:
+          linear-gradient(90deg, rgba(39, 48, 44, 0.045) 1px, transparent 1px),
+          linear-gradient(0deg, rgba(39, 48, 44, 0.04) 1px, transparent 1px),
+          var(--bg);
+        background-size: 28px 28px;
+        color: var(--ink);
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      a {
+        color: var(--blue);
+        font-weight: 700;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 3px;
+      }
+
+      :focus-visible {
+        outline: 3px solid var(--gold);
+        outline-offset: 3px;
+      }
+
+      .shell {
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 28px 0 48px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.25fr) minmax(280px, 0.75fr);
+        gap: 24px;
+        align-items: stretch;
+        min-height: 420px;
+      }
+
+      .hero-main,
+      .hero-side,
+      .section,
+      .node,
+      .table-wrap {
+        background: rgba(255, 253, 250, 0.94);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow);
+      }
+
+      .hero-main {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 34px;
+      }
+
+      .kicker,
+      .eyebrow,
+      .tag {
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        letter-spacing: 0;
+        line-height: 1.1;
+      }
+
+      h1 {
+        max-width: 760px;
+        margin-top: 18px;
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(40px, 6vw, 82px);
+        font-weight: 700;
+      }
+
+      h2 {
+        font-family: Georgia, "Times New Roman", serif;
+        font-size: clamp(26px, 4vw, 44px);
+      }
+
+      h3 {
+        font-size: 17px;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .hero-copy {
+        max-width: 720px;
+        margin-top: 18px;
+        font-size: 17px;
+        color: #2f3935;
+      }
+
+      .hero-meta {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 34px;
+      }
+
+      .metric {
+        border-top: 3px solid var(--charcoal);
+        padding-top: 10px;
+      }
+
+      .metric strong {
+        display: block;
+        color: var(--ink);
+        font-size: 17px;
+      }
+
+      .metric span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .hero-side {
+        padding: 24px;
+      }
+
+      .stack-list {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .stack-item {
+        border-left: 4px solid var(--green);
+        background: var(--green-soft);
+        padding: 12px 14px;
+      }
+
+      .stack-item:nth-child(2n) {
+        border-left-color: var(--blue);
+        background: var(--blue-soft);
+      }
+
+      .stack-item:nth-child(3n) {
+        border-left-color: var(--gold);
+        background: var(--gold-soft);
+      }
+
+      .stack-item strong {
+        display: block;
+        color: var(--ink);
+      }
+
+      .stack-item span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .nav {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 18px 0;
+        padding: 10px;
+        background: rgba(246, 243, 236, 0.9);
+        border: 1px solid var(--line);
+        backdrop-filter: blur(14px);
+      }
+
+      .nav a {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        padding: 8px 12px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+        color: var(--ink);
+        font-size: 13px;
+        text-decoration: none;
+      }
+
+      .section {
+        margin-top: 18px;
+        padding: 26px;
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: start;
+        margin-bottom: 20px;
+      }
+
+      .section-header p {
+        max-width: 560px;
+      }
+
+      .grid {
+        display: grid;
+        gap: 14px;
+      }
+
+      .grid.two {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .node {
+        box-shadow: none;
+        padding: 16px;
+        min-height: 132px;
+      }
+
+      .node.accent-green {
+        border-top: 5px solid var(--green);
+      }
+
+      .node.accent-blue {
+        border-top: 5px solid var(--blue);
+      }
+
+      .node.accent-gold {
+        border-top: 5px solid var(--gold);
+      }
+
+      .node.accent-red {
+        border-top: 5px solid var(--red);
+      }
+
+      .node p {
+        margin-top: 8px;
+        font-size: 13px;
+      }
+
+      .node code,
+      .inline-code {
+        padding: 2px 5px;
+        background: #eee7d8;
+        border: 1px solid #d8cfbf;
+        color: #18231f;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .diagram {
+        display: grid;
+        gap: 12px;
+      }
+
+      .diagram-row {
+        display: grid;
+        grid-template-columns: 1fr 44px 1fr 44px 1fr;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .diagram-row.compact {
+        grid-template-columns: 1fr 44px 1fr;
+      }
+
+      .box {
+        min-height: 92px;
+        padding: 14px;
+        border: 1px solid var(--strong-line);
+        background: var(--paper);
+      }
+
+      .box strong {
+        display: block;
+        margin-bottom: 6px;
+      }
+
+      .box span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .arrow {
+        color: var(--strong-line);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-weight: 800;
+        text-align: center;
+      }
+
+      .flow {
+        display: grid;
+        gap: 10px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .flow li {
+        display: grid;
+        grid-template-columns: 38px 1fr;
+        gap: 12px;
+        align-items: start;
+        padding: 12px;
+        border: 1px solid var(--line);
+        background: var(--paper);
+      }
+
+      .step-number {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        background: var(--charcoal);
+        color: var(--paper);
+        font-weight: 800;
+      }
+
+      .flow strong {
+        display: block;
+      }
+
+      .flow span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .table-wrap {
+        overflow-x: auto;
+        box-shadow: none;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 780px;
+        background: var(--paper);
+      }
+
+      th,
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      th {
+        background: #ebe3d4;
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      td {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      td strong {
+        color: var(--ink);
+      }
+
+      .callout {
+        margin-top: 14px;
+        padding: 16px;
+        border-left: 5px solid var(--red);
+        background: var(--red-soft);
+        color: #3d2320;
+      }
+
+      .callout strong {
+        display: block;
+        margin-bottom: 4px;
+        color: #3d2320;
+      }
+
+      .footer {
+        margin-top: 22px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .grid.two,
+        .grid.three,
+        .diagram-row,
+        .diagram-row.compact {
+          grid-template-columns: 1fr;
+        }
+
+        .arrow {
+          transform: rotate(90deg);
+        }
+
+        .hero-meta {
+          grid-template-columns: 1fr;
+        }
+
+        .section-header {
+          display: grid;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero" aria-labelledby="page-title">
+        <div class="hero-main">
+          <div>
+            <div class="kicker">High Level Architecture</div>
+            <h1 id="page-title">ReviewLens AI</h1>
+            <p class="hero-copy">
+              Rails review intelligence portal for ingesting public Trustpilot or pasted review data,
+              summarizing the corpus, and answering only evidence-grounded product questions with
+              review IDs and explicit refusals for out-of-scope prompts.
+            </p>
+          </div>
+
+          <div class="hero-meta" aria-label="Architecture summary">
+            <div class="metric">
+              <strong>Rails 8.1 monolith</strong>
+              <span>Hotwire, ERB, Tailwind, Importmap</span>
+            </div>
+            <div class="metric">
+              <strong>PostgreSQL backed</strong>
+              <span>App data, Solid Queue, Solid Cache, Solid Cable</span>
+            </div>
+            <div class="metric">
+              <strong>Guarded AI path</strong>
+              <span>RubyLLM structured outputs over stored reviews</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="hero-side" aria-labelledby="source-title">
+          <div class="eyebrow" id="source-title">Generated From Current Repo</div>
+          <div class="stack-list">
+            <div class="stack-item">
+              <strong>Source of truth</strong>
+              <span><span class="inline-code">docs/prd.md</span>, routes, models, jobs, services, schema</span>
+            </div>
+            <div class="stack-item">
+              <strong>Supported ingestion</strong>
+              <span>Trustpilot URL fetch and manual pasted review import</span>
+            </div>
+            <div class="stack-item">
+              <strong>Deployment shape</strong>
+              <span>Kamal 2 to DigitalOcean, single web role, Solid Queue in Puma</span>
+            </div>
+            <div class="stack-item">
+              <strong>Generated</strong>
+              <span>June 26, 2026</span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      <nav class="nav" aria-label="Page sections">
+        <a href="#context">Context</a>
+        <a href="#runtime">Runtime</a>
+        <a href="#flows">Flows</a>
+        <a href="#components">Components</a>
+        <a href="#data">Data</a>
+        <a href="#guardrails">Guardrails</a>
+        <a href="#deployment">Deployment</a>
+        <a href="#risks">Risks</a>
+      </nav>
+
+      <section class="section" id="context" aria-labelledby="context-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">System Context</div>
+            <h2 id="context-title">What The Application Is</h2>
+          </div>
+          <p>
+            ReviewLens AI is intentionally narrow. It is not a generic chatbot or crawler.
+            The demo-critical path is one product corpus, captured from Trustpilot or manual import,
+            then queried through a product-scoped grounded Q&amp;A service.
+          </p>
+        </div>
+
+        <div class="diagram-row">
+          <div class="box">
+            <strong>Analyst</strong>
+            <span>Pastes a Trustpilot review URL or pasted review blocks, monitors ingestion, asks product questions.</span>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="box">
+            <strong>ReviewLens Rails App</strong>
+            <span>Validates source, fetches or parses review content, stores normalized reviews, runs summaries, answers questions.</span>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="box">
+            <strong>External Services</strong>
+            <span>Trustpilot public pages for URL ingestion, OpenAI through RubyLLM for structured AI calls, DigitalOcean for hosting.</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="runtime" aria-labelledby="runtime-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Runtime Architecture</div>
+            <h2 id="runtime-title">Rails Monolith, Separate Responsibilities</h2>
+          </div>
+          <p>
+            The app keeps operational complexity low: Rails handles web UI, background work,
+            Active Record persistence, and Turbo updates. The important separation is at service boundaries,
+            not at process or microservice boundaries.
+          </p>
+        </div>
+
+        <div class="diagram">
+          <div class="diagram-row">
+            <div class="box">
+              <strong>Browser UI</strong>
+              <span>Products screens, ingestion status, conversation screens, Turbo streams.</span>
+            </div>
+            <div class="arrow">-&gt;</div>
+            <div class="box">
+              <strong>Rails Controllers</strong>
+              <span><span class="inline-code">ProductsController</span>, <span class="inline-code">ChatMessagesController</span>, <span class="inline-code">ConversationsController</span>.</span>
+            </div>
+            <div class="arrow">-&gt;</div>
+            <div class="box">
+              <strong>Domain Services</strong>
+              <span>Fetcher, adapters, importer, summary builder, batch summarizer, scope guard, context builder, answerer.</span>
+            </div>
+          </div>
+
+          <div class="diagram-row">
+            <div class="box">
+              <strong>PostgreSQL</strong>
+              <span>Products, ingestion runs, reviews, insight batches, conversations, chat messages, AI model metadata.</span>
+            </div>
+            <div class="arrow">&lt;-&gt;</div>
+            <div class="box">
+              <strong>Active Job / Solid Queue</strong>
+              <span><span class="inline-code">IngestReviewsJob</span> and <span class="inline-code">ConversationResponseJob</span> run through database-backed queueing.</span>
+            </div>
+            <div class="arrow">&lt;-&gt;</div>
+            <div class="box">
+              <strong>RubyLLM / OpenAI</strong>
+              <span>Structured batch summaries, scope guard classification, and grounded answer generation.</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="flows" aria-labelledby="flows-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Critical Flows</div>
+            <h2 id="flows-title">How Data Moves</h2>
+          </div>
+          <p>
+            Both ingestion paths converge on normalized reviews. Q&amp;A then consumes persisted summaries
+            and selected review text, not live web pages or generic model memory.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <div>
+            <h3>URL Ingestion Flow</h3>
+            <ol class="flow">
+              <li><span class="step-number">1</span><span><strong>Create product</strong><span><span class="inline-code">POST /products</span> validates Trustpilot URL and creates an ingestion run.</span></span></li>
+              <li><span class="step-number">2</span><span><strong>Fetch public HTML</strong><span><span class="inline-code">Ingestion::Fetcher</span> allows only Trustpilot hosts, two redirects, ten seconds, five MB.</span></span></li>
+              <li><span class="step-number">3</span><span><strong>Probe and parse</strong><span><span class="inline-code">TrustpilotProbe</span> detects thin corpus or blocking, then <span class="inline-code">TrustpilotAdapter</span> extracts review cards.</span></span></li>
+              <li><span class="step-number">4</span><span><strong>Normalize reviews</strong><span><span class="inline-code">Ingestion::Importer</span> truncates long bodies, deduplicates by external ID or content hash, updates product summary.</span></span></li>
+              <li><span class="step-number">5</span><span><strong>Summarize corpus</strong><span><span class="inline-code">BatchSummarizer</span> stores structured 30-review insight batches and marks product ready.</span></span></li>
+            </ol>
+          </div>
+
+          <div>
+            <h3>Grounded Q&amp;A Flow</h3>
+            <ol class="flow">
+              <li><span class="step-number">1</span><span><strong>Ask from product</strong><span>Product chat creates a product-linked <span class="inline-code">Conversation</span> and enqueues response generation.</span></span></li>
+              <li><span class="step-number">2</span><span><strong>Scope first</strong><span><span class="inline-code">ScopeGuard</span> blocks weather, competitor comparisons, other review sources, and outside knowledge.</span></span></li>
+              <li><span class="step-number">3</span><span><strong>Build context</strong><span><span class="inline-code">ContextBuilder</span> combines product summary, insight batches, and up to 50 keyword-matched reviews.</span></span></li>
+              <li><span class="step-number">4</span><span><strong>Answer with schema</strong><span><span class="inline-code">QuestionAnswerer</span> asks RubyLLM for answer markdown, confidence, limitations, and review IDs.</span></span></li>
+              <li><span class="step-number">5</span><span><strong>Persist evidence</strong><span>Assistant response stores raw metadata in <span class="inline-code">chat_messages.content_raw</span>.</span></span></li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="components" aria-labelledby="components-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Application Components</div>
+            <h2 id="components-title">Main Code Boundaries</h2>
+          </div>
+          <p>
+            The useful architecture line is between entry points, ingestion services,
+            review analysis services, and persistence. Avoiding extra layers is a strength here.
+          </p>
+        </div>
+
+        <div class="grid three">
+          <article class="node accent-green">
+            <h3>Product Entry Points</h3>
+            <p><code>ProductsController</code> owns new, create, and show. URL imports enqueue a job. Manual imports run through a service inside the request transaction.</p>
+          </article>
+          <article class="node accent-blue">
+            <h3>Review Platform Adapters</h3>
+            <p><code>TrustpilotAdapter</code> parses public HTML. <code>ManualAdapter</code> parses pasted text or CSV-like input. Network fetching stays outside adapters.</p>
+          </article>
+          <article class="node accent-gold">
+            <h3>Ingestion Pipeline</h3>
+            <p><code>Fetcher</code>, <code>TrustpilotProbe</code>, <code>Importer</code>, and <code>SummaryBuilder</code> enforce host limits, quality checks, dedupe, and product-level summary data.</p>
+          </article>
+          <article class="node accent-green">
+            <h3>Review Analysis</h3>
+            <p><code>BatchSummarizer</code> creates durable AI summaries. <code>ContextBuilder</code> selects bounded review evidence for each question.</p>
+          </article>
+          <article class="node accent-red">
+            <h3>Guarded Answering</h3>
+            <p><code>ScopeGuard</code> classifies scope before generation. <code>QuestionAnswerer</code> refuses blocked prompts or returns schema-bound answer metadata.</p>
+          </article>
+          <article class="node accent-blue">
+            <h3>Generic Chat Foundation</h3>
+            <p><code>/conversations</code> also supports generic RubyLLM chat. That is separate from the product-scoped demo path and should not be confused with guarded review Q&amp;A.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="data" aria-labelledby="data-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Data Architecture</div>
+            <h2 id="data-title">Tables That Matter</h2>
+          </div>
+          <p>
+            PostgreSQL is the system of record. The key design choice is that review evidence,
+            AI summaries, refusals, and answer metadata are persisted for reviewability.
+          </p>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Table</th>
+                <th>Purpose</th>
+                <th>Important Fields</th>
+                <th>Important Constraints</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>products</strong></td>
+                <td>One ingested review corpus and its ingestion state.</td>
+                <td>platform, external_id, source_url, ingestion_status, reviews_count, rating_distribution, ingestion_summary.</td>
+                <td>Unique platform and external_id. Status indexed.</td>
+              </tr>
+              <tr>
+                <td><strong>ingestion_runs</strong></td>
+                <td>Execution record for each import attempt.</td>
+                <td>status, parser_version, raw_fetch_metadata, warnings, reviews_found, reviews_imported, reviews_skipped, error.</td>
+                <td>Belongs to product. Status indexed.</td>
+              </tr>
+              <tr>
+                <td><strong>reviews</strong></td>
+                <td>Normalized evidence corpus.</td>
+                <td>body, title, rating, sentiment, reviewer metadata, review_date, raw_payload, content_hash.</td>
+                <td>Unique product plus content_hash, unique product plus external_review_id when present.</td>
+              </tr>
+              <tr>
+                <td><strong>insight_batches</strong></td>
+                <td>Structured AI summaries over review batches.</td>
+                <td>batch_index, review_ids, reviews_count, summary JSON.</td>
+                <td>Unique product plus batch_index.</td>
+              </tr>
+              <tr>
+                <td><strong>conversations</strong></td>
+                <td>Chat session, optionally tied to a product.</td>
+                <td>product_id, ai_model_id, timestamps.</td>
+                <td>Product is optional, enabling generic chat and product-scoped chat.</td>
+              </tr>
+              <tr>
+                <td><strong>chat_messages</strong></td>
+                <td>User and assistant messages with answer metadata.</td>
+                <td>role, content, content_raw, token fields, tool_call_id.</td>
+                <td>Conversation required. Role indexed.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section" id="guardrails" aria-labelledby="guardrails-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">AI Guardrails</div>
+            <h2 id="guardrails-title">Evidence First, Refuse The Rest</h2>
+          </div>
+          <p>
+            The product path uses three AI-adjacent stages: batch summarization, scope classification,
+            and answer generation. The guardrail runs before answer generation.
+          </p>
+        </div>
+
+        <div class="diagram-row compact">
+          <div class="box">
+            <strong>ScopeGuard</strong>
+            <span>Deterministic pattern checks plus model classification reject other platforms, competitor comparisons, current facts, and external review sources.</span>
+          </div>
+          <div class="arrow">-&gt;</div>
+          <div class="box">
+            <strong>QuestionAnswerer</strong>
+            <span>Uses only supplied context. Returns answer markdown, confidence, supporting review IDs, limitations, or refusal metadata.</span>
+          </div>
+        </div>
+
+        <div class="callout">
+          <strong>Architecture constraint</strong>
+          Product answers must be grounded in stored review context. Live browsing, broad model knowledge, competitor claims, and cross-platform review comparisons are outside the product contract.
+        </div>
+      </section>
+
+      <section class="section" id="deployment" aria-labelledby="deployment-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Deployment Architecture</div>
+            <h2 id="deployment-title">DigitalOcean Demo Topology</h2>
+          </div>
+          <p>
+            Deployment favors a small, auditable demo footprint over distributed complexity.
+            Kamal manages the app container, registry, proxy, and accessory services.
+          </p>
+        </div>
+
+        <div class="grid three">
+          <article class="node accent-blue">
+            <h3>Kamal 2</h3>
+            <p>Deploys container image <code>reviewlens/review_lens</code> through DigitalOcean Container Registry to <code>app.cairnfoundry.com</code>.</p>
+          </article>
+          <article class="node accent-green">
+            <h3>Single Web Role</h3>
+            <p>Puma serves Rails and runs Solid Queue in-process via <code>SOLID_QUEUE_IN_PUMA=true</code>, reducing demo ops overhead.</p>
+          </article>
+          <article class="node accent-gold">
+            <h3>PostgreSQL And Storage</h3>
+            <p>PostgreSQL backs app data and Solid adapters. Active Storage is configured for DigitalOcean Spaces in production.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" id="risks" aria-labelledby="risks-title">
+        <div class="section-header">
+          <div>
+            <div class="eyebrow">Architecture Notes</div>
+            <h2 id="risks-title">Known Risks And Honest Boundaries</h2>
+          </div>
+          <p>
+            These are not reasons to add architecture. They are the places where a reviewer
+            will look for proof that the current simple architecture is deliberate.
+          </p>
+        </div>
+
+        <div class="grid two">
+          <article class="node accent-red">
+            <h3>Trustpilot Is Best Effort</h3>
+            <p>The fetcher refuses unsupported hosts, large responses, excessive redirects, and blocking pages. If public HTML is thin or blocked, manual import is the correct fallback.</p>
+          </article>
+          <article class="node accent-gold">
+            <h3>README Is Behind Code</h3>
+            <p>The README still says grounded Q&amp;A needs layering. Current services now include product-scoped scope guard, context builder, and question answerer, so docs should be refreshed before final review.</p>
+          </article>
+          <article class="node accent-blue">
+            <h3>Generic Chat Is A Side Path</h3>
+            <p>The generic RubyLLM conversation route is useful foundation code, but demo evaluation should use product-linked conversations so guardrails and review evidence are enforced.</p>
+          </article>
+          <article class="node accent-green">
+            <h3>No Vector Store By Design</h3>
+            <p>Context selection uses summaries plus keyword-matched reviews capped at 50. That is enough for the exercise and avoids premature RAG infrastructure.</p>
+          </article>
+        </div>
+
+        <p class="footer">
+          Generated from the active ReviewLens repository on June 26, 2026.
+          Key inspected files include <span class="inline-code">docs/prd.md</span>,
+          <span class="inline-code">config/routes.rb</span>, <span class="inline-code">db/schema.rb</span>,
+          <span class="inline-code">app/controllers</span>, <span class="inline-code">app/jobs</span>,
+          and <span class="inline-code">app/services</span>.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>
