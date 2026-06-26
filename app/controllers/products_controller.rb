@@ -8,6 +8,13 @@ class ProductsController < ApplicationController
     @ingestion_run = @product.ingestion_runs.order(:created_at).last
 
     raise ActiveRecord::RecordNotFound, "Ingestion run missing" unless @ingestion_run
+
+    if @product.ready? && @product.reviews_count > 0
+      @sample_reviews = @product.reviews.order(rating: :desc, created_at: :asc).limit(10)
+      @field_coverage = compute_field_coverage
+    end
+
+    @chat_messages = (session.dig(:chat, @product.id.to_s) || [])
   end
 
   def create
@@ -56,5 +63,28 @@ class ProductsController < ApplicationController
 
     def manual_product_params
       product_params.slice(:name, :source_url)
+    end
+
+    def compute_field_coverage
+      total = @product.reviews_count.to_f
+      return [] if total.zero?
+
+      reviews = @product.reviews
+      rows = [
+        [ "Star rating",    reviews.where.not(rating: nil).count ],
+        [ "Review title",   reviews.where.not(title: [ nil, "" ]).count ],
+        [ "Body text",      reviews.where.not(body: [ nil, "" ]).count ],
+        [ "Author name",    reviews.where.not(reviewer_label: [ nil, "" ]).count ],
+        [ "Review date",    reviews.where.not(review_date: nil).count ],
+        [ "Reviewer role",  reviews.where.not(reviewer_role: [ nil, "" ]).count ],
+        [ "Company size",   reviews.where.not(reviewer_company_size: [ nil, "" ]).count ]
+      ]
+
+      rows.map do |field, count|
+        pct = (count / total * 100).round
+        bar_color = pct >= 80 ? "#1f8a5b" : pct >= 40 ? "#c08a1e" : "#c2c6cc"
+        ink_color  = pct >= 80 ? "#166b47" : pct >= 40 ? "#8a5e10" : "#8a9099"
+        { field:, pct:, bar_color:, ink_color: }
+      end
     end
 end

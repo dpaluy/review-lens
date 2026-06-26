@@ -1,31 +1,33 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title><%= content_for(:title) || "Review Lens" %></title>
+    <title><%= content_for(:title) || "ReviewLens" %></title>
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="application-name" content="Review Lens">
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="ReviewLens">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-
     <%= yield :head %>
-
-    <%# Enable PWA manifest for installable apps (make sure to enable in config/routes.rb too!) %>
-    <%#= tag.link rel: "manifest", href: pwa_manifest_path(format: :json) %>
-
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="icon" href="/icon.png" type="image/png">
     <link rel="icon" href="/icon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon.png">
-
-    <%# Includes all stylesheet files in app/assets/stylesheets %>
     <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
     <%= javascript_importmap_tags %>
   </head>
-
   <body>
-    <main class="container mx-auto mt-28 px-5 flex">
-      <%= yield %>
-    </main>
+    <header style="position:sticky;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;padding:13px 28px;background:rgba(247,247,245,0.86);backdrop-filter:blur(10px);border-bottom:1px solid #e6e6e2;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <%= link_to root_path, style: "display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;" do %>
+          <div style="width:22px;height:22px;border-radius:6px;background:#1f8a5b;"></div>
+          <span style="font-weight:600;font-size:15px;letter-spacing:-0.01em;">ReviewLens</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:#8a9099;border:1px solid #e3e3df;border-radius:5px;padding:2px 6px;">ANALYST</span>
+        <% end %>
+      </div>
+      <%= yield :header_action %>
+    </header>
+    <%= yield %>
   </body>
 </html>
