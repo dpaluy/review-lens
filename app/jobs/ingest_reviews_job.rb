@@ -3,6 +3,7 @@ class IngestReviewsJob < ApplicationJob
 
   FETCH_FAILURE_MESSAGE = "Trustpilot fetch failed: %s"
   NO_USABLE_REVIEWS_MESSAGE = "No usable Trustpilot review cards found. Use manual import or another public Trustpilot URL."
+  SUMMARIZATION_FAILURE_MESSAGE = "Review summarization failed: %s"
   BLOCKED_WARNING = "Trustpilot returned blocking page before parsing"
   THIN_CORPUS_WARNING = "Trustpilot returned fewer than 20 usable raw reviews; manual import recommended"
 
@@ -70,9 +71,16 @@ class IngestReviewsJob < ApplicationJob
       ingestion_run.update!(status: "summarizing")
 
       Ingestion::SummaryBuilder.new(product:).call
+      summarize_reviews
 
       product.update!(ingestion_status: "ready", ingestion_error: nil)
       ingestion_run.update!(status: "ready", finished_at: Time.current)
+    end
+
+    def summarize_reviews
+      ReviewAnalysis::BatchSummarizer.call(product:)
+    rescue StandardError => error
+      raise StandardError, SUMMARIZATION_FAILURE_MESSAGE % error.message
     end
 
     def mark_failed(error_message)

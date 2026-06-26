@@ -83,19 +83,25 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
 
     TEXT
 
-    assert_difference -> { Product.count }, 1 do
-      assert_difference -> { IngestionRun.count }, 1 do
-        assert_difference -> { Review.count }, 2 do
-          post products_path, params: {
-            product: {
-              import_mode: "manual",
-              name: "Manual CRM",
-              source_url: "https://example.com/manual-crm-reviews",
-              manual_reviews: pasted_reviews
-            }
-          }
+    with_fake_batch_summary_client do |client|
+      assert_difference -> { Product.count }, 1 do
+        assert_difference -> { IngestionRun.count }, 1 do
+          assert_difference -> { Review.count }, 2 do
+            assert_difference -> { InsightBatch.count }, 1 do
+              post products_path, params: {
+                product: {
+                  import_mode: "manual",
+                  name: "Manual CRM",
+                  source_url: "https://example.com/manual-crm-reviews",
+                  manual_reviews: pasted_reviews
+                }
+              }
+            end
+          end
         end
       end
+
+      assert_equal 1, client.calls.size
     end
 
     product = Product.order(:created_at).last
@@ -111,6 +117,7 @@ class ProductsFlowTest < ActionDispatch::IntegrationTest
     assert_equal 2, ingestion_run.reviews_imported
     assert_equal 1, ingestion_run.reviews_skipped
     assert_equal 2, product.reviews_count
+    assert_equal 1, product.insight_batches.count
     assert_equal [
       "Billing was confusing and cancellation took too long.",
       "Setup was simple and support answered quickly."

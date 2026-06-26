@@ -1,6 +1,7 @@
 module Ingestion
   class ManualImport
     NO_USABLE_REVIEWS_ERROR = "No usable manual review blocks were provided."
+    SUMMARIZATION_FAILURE_MESSAGE = "Review summarization failed: %s"
 
     def initialize(product:, ingestion_run:, pasted_reviews:)
       @product = product
@@ -31,19 +32,26 @@ module Ingestion
     end
 
     private
-      def mark_ready
-        @product.update!(ingestion_status: "summarizing")
-        @ingestion_run.update!(status: "summarizing")
+    def mark_ready
+      @product.update!(ingestion_status: "summarizing")
+      @ingestion_run.update!(status: "summarizing")
 
-        Ingestion::SummaryBuilder.new(product: @product).call
+      Ingestion::SummaryBuilder.new(product: @product).call
+      summarize_reviews
 
-        @product.update!(ingestion_status: "ready", ingestion_error: nil)
-        @ingestion_run.update!(status: "ready", finished_at: Time.current)
-      end
+      @product.update!(ingestion_status: "ready", ingestion_error: nil)
+      @ingestion_run.update!(status: "ready", finished_at: Time.current)
+    end
 
-      def mark_failed(error_message)
-        @product.update!(ingestion_status: "failed", ingestion_error: error_message)
-        @ingestion_run.update!(status: "failed", error: error_message, finished_at: Time.current)
-      end
+    def summarize_reviews
+      ReviewAnalysis::BatchSummarizer.call(product: @product)
+    rescue StandardError => error
+      raise StandardError, SUMMARIZATION_FAILURE_MESSAGE % error.message
+    end
+
+    def mark_failed(error_message)
+      @product.update!(ingestion_status: "failed", ingestion_error: error_message)
+      @ingestion_run.update!(status: "failed", error: error_message, finished_at: Time.current)
+    end
   end
 end
