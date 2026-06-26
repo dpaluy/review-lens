@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REGISTRY_NAME="${DOCR_REGISTRY:-reviewlens}"
+REPOSITORY="${DOCR_REPOSITORY:-review_lens}"
+KEEP_MANIFESTS="${DOCR_KEEP_MANIFESTS:-5}"
+DRY_RUN="${DRY_RUN:-0}"
+SKIP_GC="${SKIP_GC:-0}"
+
+if ! command -v doctl >/dev/null 2>&1; then
+  echo "doctl is required. Install and authenticate it before pruning the registry." >&2
+  exit 1
+fi
+
+if ! [[ "$KEEP_MANIFESTS" =~ ^[0-9]+$ ]] || [ "$KEEP_MANIFESTS" -lt 1 ]; then
+  echo "DOCR_KEEP_MANIFESTS must be a positive integer." >&2
+  exit 1
+fi
+
+doctl_cmd() {
+  if [ -n "${DIGITALOCEAN_API_TOKEN:-}" ]; then
+    doctl --access-token "$DIGITALOCEAN_API_TOKEN" "$@"
+  else
+    doctl "$@"
+  fi
+}
+
+manifest_file="$(mktemp)"
+delete_file="$(mktemp)"
+trap 'rm -f "$manifest_file" "$delete_file"' EXIT
+
+doctl_cmd registry repository list-manifests "$REPOSITORY" \
+  --registry "$REGISTRY_NAME" \
+  --format Digest,UpdatedAt \
+  --no-header |
+  awk '$1 ~ /^sha256:/ { print $1, $2 }' |
+  sort -k2,2r > "$manifest_file"
+
+manifest_count="$(wc -l < "$manifest_file" | tr -d ' ')"
+if [ "$manifest_count" -eq 0 ]; then
+  echo "No manifests found for registry=$REGISTRY_NAME repository=$REPOSITORY."
+  exit 0
+fi
+
+echo "Found $manifest_count manifests in registry=$REGISTRY_NAME repository=$REPOSITORY."
+echo "Keeping the newest $KEEP_MANIFESTS manifests. Override with DOCR_KEEP_MANIFESTS=N."
+
+tail -n +"$((KEEP_MANIFESTS + 1))" "$manifest_file" > "$delete_file"
+
+delete_count="$(wc -l < "$delete_file" | tr -d ' ')"
+if [ "$delete_count" -eq 0 ]; then
+  echo "Nothing to delete."
+else
+  while read -r digest updated_at; do
+    [ -n "$digest" ] || continue
+
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "Would delete manifest $digest updated_at=$updated_at"
+    else
+      echo "Deleting manifest $digest updated_at=$updated_at"
+      doctl_cmd registry repository delete-manifest "$REPOSITORY" "$digest" \
+        --registry "$REGISTRY_NAME" \
+        --force
+    fi
+  done < "$delete_file"
+fi
+
+if [ "$DRY_RUN" = "1" ] || [ "$SKIP_GC" = "1" ]; then
+  echo "Skipping garbage collection."
+  exit 0
+fi
+
+echo "Starting DigitalOcean registry garbage collection with untagged manifests included."
+doctl_cmd registry garbage-collection start "$REGISTRY_NAME" \
+  --include-untagged-manifests \
+  --force
