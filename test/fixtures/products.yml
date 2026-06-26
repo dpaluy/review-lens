@@ -19,3 +19,37 @@ manual:
   rating_distribution: {}
   sentiment_distribution: {}
   ingestion_summary: {}
+
+fetching:
+  platform: trustpilot
+  source_url: https://www.trustpilot.com/review/fetching.example.com
+  external_id: fetching.example.com
+  name: Fetching Example
+  ingestion_status: fetching
+  reviews_count: 0
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}
+
+ready:
+  platform: trustpilot
+  source_url: https://www.trustpilot.com/review/ready.example.com
+  external_id: ready.example.com
+  name: Ready Example
+  ingestion_status: ready
+  reviews_count: 24
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}
+
+failed:
+  platform: trustpilot
+  source_url: https://www.trustpilot.com/review/failed.example.com
+  external_id: failed.example.com
+  name: Failed Example
+  ingestion_status: failed
+  ingestion_error: Fetch blocked by remote host
+  reviews_count: 0
+  rating_distribution: {}
+  sentiment_distribution: {}
+  ingestion_summary: {}
