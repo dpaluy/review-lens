@@ -6,9 +6,9 @@ branches.
 
 ## Deployment
 
-- Public URL: `TODO`
-- GitHub repository URL: `TODO`
-- Demo data source: `TODO`
+- Public URL: `https://app.cairnfoundry.com`
+- GitHub repository URL: `https://github.com/dpaluy/review-lens`
+- Demo data source: `https://www.trustpilot.com/review/quickbooks.intuit.com`
 - Primary path works from a fresh browser session.
 - Background worker is running in production.
 - PostgreSQL-backed persistence survives a page refresh.
