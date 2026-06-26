@@ -1,4 +1,4 @@
-<% assistant ||= local_assigns[:message] %>
+<% assistant ||= local_assigns[:message] || local_assigns[:chat_message] %>
 <% metadata = assistant.answer_metadata %>
 <div id="chat_message_<%= assistant.id %>" class="w-full sm:w-auto my-5 space-y-3 rounded-md px-3 py-2 bg-green-50">
   <div>
